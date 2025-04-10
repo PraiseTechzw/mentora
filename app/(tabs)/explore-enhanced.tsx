@@ -43,34 +43,6 @@ const CATEGORIES = [
   { id: "8", name: "Health", icon: "heartbeat", count: 143, color: "#F94144" },
 ]
 
-// Mock trending courses
-const TRENDING_COURSES = [
-  {
-    id: "1",
-    title: "Machine Learning Fundamentals",
-    instructor: "Dr. Andrew Smith",
-    thumbnail: "https://i.ytimg.com/vi/NWONeJKn6kc/maxresdefault.jpg",
-    rating: 4.8,
-    students: 12453,
-  },
-  {
-    id: "2",
-    title: "Complete Web Development Bootcamp",
-    instructor: "Jessica Chen",
-    thumbnail: "https://i.ytimg.com/vi/PkZNo7MFNFg/maxresdefault.jpg",
-    rating: 4.9,
-    students: 28941,
-  },
-  {
-    id: "3",
-    title: "Financial Literacy: Master Your Money",
-    instructor: "Robert Kiyosaki",
-    thumbnail: "https://i.ytimg.com/vi/KCzIfiLZK7w/maxresdefault.jpg",
-    rating: 4.7,
-    students: 9872,
-  },
-]
-
 // Mock featured content
 const FEATURED_CONTENT = [
   {
@@ -99,6 +71,34 @@ const FEATURED_CONTENT = [
     category: "Business",
     duration: "15:20",
     source: "udemy",
+  },
+]
+
+// Mock trending courses
+const TRENDING_COURSES = [
+  {
+    id: "1",
+    title: "Machine Learning Fundamentals",
+    instructor: "Dr. Andrew Smith",
+    thumbnail: "https://i.ytimg.com/vi/NWONeJKn6kc/maxresdefault.jpg",
+    rating: 4.8,
+    students: 12453,
+  },
+  {
+    id: "2",
+    title: "Complete Web Development Bootcamp",
+    instructor: "Jessica Chen",
+    thumbnail: "https://i.ytimg.com/vi/PkZNo7MFNFg/maxresdefault.jpg",
+    rating: 4.9,
+    students: 28941,
+  },
+  {
+    id: "3",
+    title: "Financial Literacy: Master Your Money",
+    instructor: "Robert Kiyosaki",
+    thumbnail: "https://i.ytimg.com/vi/KCzIfiLZK7w/maxresdefault.jpg",
+    rating: 4.7,
+    students: 9872,
   },
 ]
 
@@ -438,17 +438,17 @@ export default function ExploreScreen() {
           {/* Header with greeting */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.greeting}>Hello, Alex! 👋</Text>
+              <Text style={styles.greeting}>Hello, {USER.name}! 👋</Text>
               <Text style={styles.subGreeting}>What would you like to learn today?</Text>
             </View>
             <View style={styles.userStats}>
               <View style={styles.userStatItem}>
                 <FontAwesome5 name="fire" size={16} color="#FF6B6B" />
-                <Text style={styles.userStatText}>7 day streak</Text>
+                <Text style={styles.userStatText}>{USER.streak} day streak</Text>
               </View>
               <View style={styles.userStatItem}>
                 <FontAwesome5 name="star" size={16} color="#FFD700" />
-                <Text style={styles.userStatText}>1250 points</Text>
+                <Text style={styles.userStatText}>{USER.points} points</Text>
               </View>
             </View>
           </View>
@@ -1113,4 +1113,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 12,
   },
-})
+}) 

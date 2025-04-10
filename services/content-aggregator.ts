@@ -16,6 +16,7 @@ export interface AggregatedVideo {
   source: "youtube" | "udemy" | "coursera" | "khan-academy" | "edx" | "custom"
   sourceUrl: string
   videoUrl: string
+  rating?: number
 }
 
 // Mock data for other platforms (in a real app, these would be API calls)
@@ -121,6 +122,7 @@ function convertUdemyToAggregated(course: (typeof UDEMY_COURSES)[0]): Aggregated
     source: "udemy",
     sourceUrl: course.url,
     videoUrl: course.url, // In a real app, this would be a preview video URL
+    rating: parseFloat(course.rating),
   }
 }
 
@@ -137,6 +139,7 @@ function convertCourseraToAggregated(course: (typeof COURSERA_COURSES)[0]): Aggr
     source: "coursera",
     sourceUrl: course.url,
     videoUrl: course.url, // In a real app, this would be a preview video URL
+    rating: parseFloat(course.rating),
   }
 }
 
@@ -153,6 +156,7 @@ function convertKhanAcademyToAggregated(course: (typeof KHAN_ACADEMY_COURSES)[0]
     source: "khan-academy",
     sourceUrl: course.url,
     videoUrl: course.url, // In a real app, this would be a preview video URL
+    rating: 4.5, // Default rating for Khan Academy courses
   }
 }
 
