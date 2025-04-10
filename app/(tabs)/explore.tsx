@@ -210,6 +210,44 @@ const AGGREGATED_VIDEOS = [
   },
 ]
 
+// Mock popular channels and sources
+const POPULAR_CHANNELS = [
+  {
+    id: "c1",
+    name: "Traversy Media",
+    type: "youtube",
+    subscribers: "1.8M",
+    description: "Web development tutorials and courses",
+    avatar: "https://yt3.googleusercontent.com/ytc/APkrFKZWeMCsx4rzNfxYYwZlnZUFr4DZt1h9JQJ8H6B4=s176-c-k-c0x00ffffff-no-rj",
+    featured: true,
+  },
+  {
+    id: "c2",
+    name: "freeCodeCamp",
+    type: "youtube",
+    subscribers: "7.2M",
+    description: "Learn to code for free",
+    avatar: "https://yt3.googleusercontent.com/ytc/APkrFKa_8ZIz9JXQps8PpMkqNk3hOKJHKXJbJZQJ8JZQ=s176-c-k-c0x00ffffff-no-rj",
+    featured: true,
+  },
+  {
+    id: "c3",
+    name: "Coursera",
+    type: "platform",
+    description: "Online learning platform with university courses",
+    logo: "https://d3njjcbhbojbot.cloudfront.net/api/utilities/v1/imageproxy/https://coursera.s3.amazonaws.com/media/coursera-logo-square.png",
+    featured: true,
+  },
+  {
+    id: "c4",
+    name: "Udemy",
+    type: "platform",
+    description: "Learn anything, anywhere",
+    logo: "https://www.udemy.com/staticx/udemy/images/v7/logo-udemy.svg",
+    featured: true,
+  },
+]
+
 const { width } = Dimensions.get("window")
 const CARD_WIDTH = width * 0.8
 const CARD_SPACING = 10
@@ -424,6 +462,42 @@ export default function ExploreScreen() {
     </View>
   )
 
+  const renderPopularChannels = () => {
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Popular Channels</Text>
+          <TouchableOpacity>
+            <Text style={styles.seeAllButton}>See All</Text>
+          </TouchableOpacity>
+        </View>
+        <FlatList
+          data={POPULAR_CHANNELS}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.channelCard}>
+              <Image
+                source={{ uri: item.type === 'youtube' ? item.avatar : item.logo }}
+                style={styles.channelAvatar}
+              />
+              <View style={styles.channelInfo}>
+                <Text style={styles.channelName}>{item.name}</Text>
+                <Text style={styles.channelDescription} numberOfLines={2}>
+                  {item.description}
+                </Text>
+                {item.type === 'youtube' && (
+                  <Text style={styles.subscriberCount}>{item.subscribers} subscribers</Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
+          keyExtractor={(item) => item.id}
+        />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {isLoading ? (
@@ -628,6 +702,8 @@ export default function ExploreScreen() {
               />
             ))}
           </View>
+
+          {renderPopularChannels()}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -1112,5 +1188,50 @@ const styles = StyleSheet.create({
     backgroundColor: "#E1E1E1",
     borderRadius: 8,
     marginBottom: 12,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  channelCard: {
+    width: 280,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginRight: 16,
+    padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  channelAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 12,
+  },
+  channelInfo: {
+    flex: 1,
+  },
+  channelName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  channelDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  subscriberCount: {
+    fontSize: 12,
+    color: '#888',
   },
 })
