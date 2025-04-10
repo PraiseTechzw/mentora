@@ -179,19 +179,19 @@ const LEARNING_PATHS = [
 ]
 
 // Mock aggregated videos for ModernVideoCard
-const AGGREGATED_VIDEOS = [
+const AGGREGATED_VIDEOS: AggregatedVideo[] = [
   {
     id: "v1",
-    title: "Introduction to React Native",
-    description: "Learn the basics of React Native development",
-    thumbnail: "https://i.ytimg.com/vi/NWONeJKn6kc/maxresdefault.jpg",
-    channelTitle: "React Native Mastery",
-    publishedAt: "2023-05-15T10:30:00Z",
-    viewCount: "125,000",
-    duration: "12:45",
-    source: "youtube",
-    sourceUrl: "https://youtube.com/watch?v=example1",
-    videoUrl: "https://youtube.com/watch?v=example1",
+    title: "Complete React Native Tutorial",
+    description: "Learn React Native from scratch",
+    thumbnail: "https://i.ytimg.com/vi/0kYk9Jh7ZtY/maxresdefault.jpg",
+    channelTitle: "Traversy Media",
+    publishedAt: "2024-03-15T10:00:00Z",
+    viewCount: "150K",
+    duration: "2:30:00",
+    source: "youtube" as const,
+    sourceUrl: "https://youtube.com/watch?v=0kYk9Jh7ZtY",
+    videoUrl: "https://youtube.com/watch?v=0kYk9Jh7ZtY",
     rating: 4.8,
   },
   {
@@ -1191,6 +1191,7 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
+    paddingHorizontal: 16,
   },
   channelCard: {
     width: 280,
