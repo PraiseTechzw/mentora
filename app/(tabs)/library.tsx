@@ -923,6 +923,12 @@ const styles = StyleSheet.create({
     color: "#666",
     marginBottom: 8,
   },
+  continueLearningProgress: {
+    marginBottom: 8,
+  },
+  continueLearningList: {
+    paddingHorizontal: 16,
+  },
   nextLesson: {
     fontSize: 12,
     color: "#666",
@@ -1050,12 +1056,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#FF6B6B",
     fontWeight: "600",
-  },
-  continueLearningProgress: {
-    marginBottom: 8,
-  },
-  continueLearningList: {
-    paddingHorizontal: 16,
   },
   recommendationsList: {
     paddingHorizontal: 16,
