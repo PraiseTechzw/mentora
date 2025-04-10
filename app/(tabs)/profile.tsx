@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react"
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Switch, Platform, Alert, RefreshControl, Image as RNImage } from "react-native"
+import { useState, useCallback, useRef, useEffect } from "react"
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Switch, Platform, Alert, RefreshControl, Image as RNImage, Animated, Dimensions } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
 import { FontAwesome5, Ionicons, MaterialIcons } from "@expo/vector-icons"
@@ -47,12 +47,33 @@ const USER = {
 
 export default function ProfileScreen() {
   const router = useRouter()
+  const scrollY = useRef(new Animated.Value(0)).current
   const [refreshing, setRefreshing] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [darkModeEnabled, setDarkModeEnabled] = useState(false)
   const [downloadOverWifiOnly, setDownloadOverWifiOnly] = useState(true)
   const [showAllAchievements, setShowAllAchievements] = useState(false)
   const [showAllActivity, setShowAllActivity] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Simulate initial loading
+    setTimeout(() => {
+      setIsLoading(false)
+    }, 1500)
+  }, [])
+
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [300, 200],
+    extrapolate: 'clamp',
+  })
+
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [1, 0.8],
+    extrapolate: 'clamp',
+  })
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
@@ -110,25 +131,30 @@ export default function ProfileScreen() {
   }
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <View style={styles.avatarContainer}>
-        <Image
-          source={USER.avatar}
-          style={styles.profileImage}
-          contentFit="cover"
-        />
-        <TouchableOpacity style={styles.changeAvatarButton} onPress={handleChangeAvatar}>
-          <Ionicons name="camera" size={16} color="#FFF" />
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.name}>{USER.name}</Text>
-      <Text style={styles.email}>{USER.email}</Text>
-      <Text style={styles.bio}>{USER.bio}</Text>
-      <View style={styles.locationContainer}>
-        <Ionicons name="location-outline" size={16} color="#666" />
-        <Text style={styles.location}>{USER.location}</Text>
-      </View>
-      <Text style={styles.joinDate}>Member since {USER.joinDate}</Text>
+    <Animated.View style={[styles.header, { height: headerHeight, opacity: headerOpacity }]}>
+      <LinearGradient
+        colors={['#FF6B6B', '#FF8E8E']}
+        style={styles.headerGradient}
+      >
+        <View style={styles.avatarContainer}>
+          <Image
+            source={USER.avatar}
+            style={styles.profileImage}
+            contentFit="cover"
+          />
+          <TouchableOpacity style={styles.changeAvatarButton} onPress={handleChangeAvatar}>
+            <Ionicons name="camera" size={16} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.name}>{USER.name}</Text>
+        <Text style={styles.email}>{USER.email}</Text>
+        <Text style={styles.bio}>{USER.bio}</Text>
+        <View style={styles.locationContainer}>
+          <Ionicons name="location-outline" size={16} color="#FFF" />
+          <Text style={[styles.location, { color: '#FFF' }]}>{USER.location}</Text>
+        </View>
+        <Text style={[styles.joinDate, { color: '#FFF' }]}>Member since {USER.joinDate}</Text>
+      </LinearGradient>
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
@@ -150,23 +176,28 @@ export default function ProfileScreen() {
       <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
         <Text style={styles.editButtonText}>Edit Profile</Text>
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   )
 
   const renderLevelProgress = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Level Progress</Text>
       <View style={styles.levelCard}>
-        <View style={styles.levelHeader}>
-          <View style={styles.levelBadge}>
-            <Text style={styles.levelText}>Level {USER.level}</Text>
+        <LinearGradient
+          colors={['#FFF', '#F8F9FA']}
+          style={styles.levelGradient}
+        >
+          <View style={styles.levelHeader}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelText}>Level {USER.level}</Text>
+            </View>
+            <Text style={styles.xpText}>{USER.xp} / {USER.nextLevel} XP</Text>
           </View>
-          <Text style={styles.xpText}>{USER.xp} / {USER.nextLevel} XP</Text>
-        </View>
-        <View style={styles.xpBarContainer}>
-          <View style={[styles.xpBar, { width: `${(USER.xp / USER.nextLevel) * 100}%` }]} />
-        </View>
-        <Text style={styles.xpToNext}>{(USER.nextLevel - USER.xp)} XP to next level</Text>
+          <View style={styles.xpBarContainer}>
+            <View style={[styles.xpBar, { width: `${(USER.xp / USER.nextLevel) * 100}%` }]} />
+          </View>
+          <Text style={styles.xpToNext}>{(USER.nextLevel - USER.xp)} XP to next level</Text>
+        </LinearGradient>
       </View>
     </View>
   )
@@ -175,25 +206,35 @@ export default function ProfileScreen() {
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Learning Progress</Text>
       <View style={styles.progressCard}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>This Week</Text>
-          <Text style={styles.progressValue}>{USER.weeklyProgress} hours</Text>
-        </View>
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBar, { width: `${(USER.weeklyProgress / USER.weeklyGoal) * 100}%` }]} />
-        </View>
-        <Text style={styles.progressTarget}>Target: {USER.weeklyGoal} hours</Text>
+        <LinearGradient
+          colors={['#FFF', '#F8F9FA']}
+          style={styles.progressGradient}
+        >
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>This Week</Text>
+            <Text style={styles.progressValue}>{USER.weeklyProgress} hours</Text>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBar, { width: `${(USER.weeklyProgress / USER.weeklyGoal) * 100}%` }]} />
+          </View>
+          <Text style={styles.progressTarget}>Target: {USER.weeklyGoal} hours</Text>
+        </LinearGradient>
       </View>
       
       <View style={[styles.progressCard, styles.monthlyProgressCard]}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>This Month</Text>
-          <Text style={styles.progressValue}>{USER.monthlyProgress} hours</Text>
-        </View>
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBar, { width: `${(USER.monthlyProgress / USER.monthlyGoal) * 100}%` }]} />
-        </View>
-        <Text style={styles.progressTarget}>Target: {USER.monthlyGoal} hours</Text>
+        <LinearGradient
+          colors={['#FFF', '#F8F9FA']}
+          style={styles.progressGradient}
+        >
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>This Month</Text>
+            <Text style={styles.progressValue}>{USER.monthlyProgress} hours</Text>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBar, { width: `${(USER.monthlyProgress / USER.monthlyGoal) * 100}%` }]} />
+          </View>
+          <Text style={styles.progressTarget}>Target: {USER.monthlyGoal} hours</Text>
+        </LinearGradient>
       </View>
     </View>
   )
@@ -202,16 +243,27 @@ export default function ProfileScreen() {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Achievements</Text>
-        <TouchableOpacity onPress={() => setShowAllAchievements(!showAllAchievements)}>
-          <Text style={styles.seeAllButton}>{showAllAchievements ? "Show Less" : "See All"}</Text>
+        <TouchableOpacity 
+          style={styles.seeAllButton}
+          onPress={() => setShowAllAchievements(!showAllAchievements)}
+        >
+          <Text style={styles.seeAllButtonText}>{showAllAchievements ? "Show Less" : "See All"}</Text>
+          <Ionicons 
+            name={showAllAchievements ? "chevron-up" : "chevron-down"} 
+            size={16} 
+            color="#FF6B6B" 
+          />
         </TouchableOpacity>
       </View>
       <View style={styles.achievementsContainer}>
         {USER.achievements.slice(0, showAllAchievements ? undefined : 3).map((achievement) => (
           <View key={achievement.id} style={styles.achievementItem}>
-            <View style={[styles.achievementIcon, { backgroundColor: achievement.color, opacity: achievement.unlocked ? 1 : 0.5 }]}>
+            <LinearGradient
+              colors={[achievement.color, achievement.color + '80']}
+              style={[styles.achievementIcon, { opacity: achievement.unlocked ? 1 : 0.5 }]}
+            >
               <FontAwesome5 name={achievement.icon} size={24} color="#FFF" />
-            </View>
+            </LinearGradient>
             <Text style={[styles.achievementName, !achievement.unlocked && styles.lockedAchievement]}>
               {achievement.name}
             </Text>
@@ -228,16 +280,27 @@ export default function ProfileScreen() {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <TouchableOpacity onPress={() => setShowAllActivity(!showAllActivity)}>
-          <Text style={styles.seeAllButton}>{showAllActivity ? "Show Less" : "See All"}</Text>
+        <TouchableOpacity 
+          style={styles.seeAllButton}
+          onPress={() => setShowAllActivity(!showAllActivity)}
+        >
+          <Text style={styles.seeAllButtonText}>{showAllActivity ? "Show Less" : "See All"}</Text>
+          <Ionicons 
+            name={showAllActivity ? "chevron-up" : "chevron-down"} 
+            size={16} 
+            color="#FF6B6B" 
+          />
         </TouchableOpacity>
       </View>
       <View style={styles.activityContainer}>
         {USER.recentActivity.slice(0, showAllActivity ? undefined : 3).map((activity) => (
           <View key={activity.id} style={styles.activityItem}>
-            <View style={styles.activityIconContainer}>
+            <LinearGradient
+              colors={['#FF6B6B', '#FF8E8E']}
+              style={styles.activityIconContainer}
+            >
               <FontAwesome5 name={activity.icon} size={16} color="#FFF" />
-            </View>
+            </LinearGradient>
             <View style={styles.activityContent}>
               <Text style={styles.activityTitle}>{activity.title}</Text>
               <Text style={styles.activityDate}>{activity.date}</Text>
@@ -279,7 +342,9 @@ export default function ProfileScreen() {
       <Text style={styles.sectionTitle}>Account Settings</Text>
       <View style={styles.settingsContainer}>
         <TouchableOpacity style={styles.settingItem}>
-          <FontAwesome5 name="bell" size={18} color="#666" />
+          <View style={styles.settingIconContainer}>
+            <FontAwesome5 name="bell" size={18} color="#FF6B6B" />
+          </View>
           <Text style={styles.settingText}>Notifications</Text>
           <Switch
             value={notificationsEnabled}
@@ -289,7 +354,9 @@ export default function ProfileScreen() {
           />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingItem}>
-          <FontAwesome5 name="moon" size={18} color="#666" />
+          <View style={styles.settingIconContainer}>
+            <FontAwesome5 name="moon" size={18} color="#FF6B6B" />
+          </View>
           <Text style={styles.settingText}>Dark Mode</Text>
           <Switch
             value={darkModeEnabled}
@@ -299,12 +366,16 @@ export default function ProfileScreen() {
           />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingItem}>
-          <FontAwesome5 name="download" size={18} color="#666" />
+          <View style={styles.settingIconContainer}>
+            <FontAwesome5 name="download" size={18} color="#FF6B6B" />
+          </View>
           <Text style={styles.settingText}>Downloads</Text>
           <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingItem}>
-          <FontAwesome5 name="wifi" size={18} color="#666" />
+          <View style={styles.settingIconContainer}>
+            <FontAwesome5 name="wifi" size={18} color="#FF6B6B" />
+          </View>
           <Text style={styles.settingText}>Download over Wi-Fi only</Text>
           <Switch
             value={downloadOverWifiOnly}
@@ -314,35 +385,56 @@ export default function ProfileScreen() {
           />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingItem}>
-          <FontAwesome5 name="shield-alt" size={18} color="#666" />
+          <View style={styles.settingIconContainer}>
+            <FontAwesome5 name="shield-alt" size={18} color="#FF6B6B" />
+          </View>
           <Text style={styles.settingText}>Privacy</Text>
           <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingItem}>
-          <FontAwesome5 name="question-circle" size={18} color="#666" />
+          <View style={styles.settingIconContainer}>
+            <FontAwesome5 name="question-circle" size={18} color="#FF6B6B" />
+          </View>
           <Text style={styles.settingText}>Help & Support</Text>
           <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingItem}>
-          <FontAwesome5 name="cog" size={18} color="#666" />
+          <View style={styles.settingIconContainer}>
+            <FontAwesome5 name="cog" size={18} color="#FF6B6B" />
+          </View>
           <Text style={styles.settingText}>Preferences</Text>
           <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
         </TouchableOpacity>
         <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
-          <FontAwesome5 name="sign-out-alt" size={18} color="#FF6B6B" />
+          <View style={[styles.settingIconContainer, styles.logoutIconContainer]}>
+            <FontAwesome5 name="sign-out-alt" size={18} color="#FF6B6B" />
+          </View>
           <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
         </TouchableOpacity>
       </View>
     </View>
   )
 
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
+      </View>
+    )
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <Animated.ScrollView 
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
       >
         {renderHeader()}
         {renderLevelProgress()}
@@ -352,7 +444,7 @@ export default function ProfileScreen() {
         {renderSkills()}
         {renderInterests()}
         {renderSettings()}
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   )
 }
@@ -362,12 +454,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
+  },
   header: {
+    position: "relative",
+    overflow: "hidden",
+  },
+  headerGradient: {
+    flex: 1,
     alignItems: "center",
     paddingVertical: 24,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EAEAEA",
   },
   avatarContainer: {
     position: "relative",
@@ -377,6 +478,8 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
+    borderWidth: 3,
+    borderColor: "#FFF",
   },
   changeAvatarButton: {
     position: "absolute",
@@ -403,17 +506,17 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#333",
+    color: "#FFF",
     marginBottom: 4,
   },
   email: {
     fontSize: 16,
-    color: "#666",
+    color: "#FFF",
     marginBottom: 8,
   },
   bio: {
     fontSize: 14,
-    color: "#666",
+    color: "#FFF",
     textAlign: "center",
     marginBottom: 8,
     paddingHorizontal: 32,
@@ -425,12 +528,10 @@ const styles = StyleSheet.create({
   },
   location: {
     fontSize: 14,
-    color: "#666",
     marginLeft: 4,
   },
   joinDate: {
     fontSize: 12,
-    color: "#999",
     marginBottom: 16,
   },
   statsContainer: {
@@ -439,9 +540,24 @@ const styles = StyleSheet.create({
     width: "100%",
     marginVertical: 16,
     paddingHorizontal: 16,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    marginHorizontal: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   statItem: {
     alignItems: "center",
+    paddingVertical: 12,
   },
   statValue: {
     fontSize: 20,
@@ -464,6 +580,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     marginTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   editButtonText: {
     color: "#FFF",
@@ -488,14 +615,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   seeAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  seeAllButtonText: {
     fontSize: 14,
     color: "#FF6B6B",
     fontWeight: "600",
+    marginRight: 4,
   },
   levelCard: {
     backgroundColor: "#FFF",
     borderRadius: 12,
-    padding: 16,
+    overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -507,6 +639,9 @@ const styles = StyleSheet.create({
         elevation: 2,
       },
     }),
+  },
+  levelGradient: {
+    padding: 16,
   },
   levelHeader: {
     flexDirection: "row",
@@ -548,7 +683,7 @@ const styles = StyleSheet.create({
   progressCard: {
     backgroundColor: "#FFF",
     borderRadius: 12,
-    padding: 16,
+    overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -560,6 +695,9 @@ const styles = StyleSheet.create({
         elevation: 2,
       },
     }),
+  },
+  progressGradient: {
+    padding: 16,
   },
   monthlyProgressCard: {
     marginTop: 12,
@@ -653,7 +791,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#FF6B6B",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -727,10 +864,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#EAEAEA",
   },
+  settingIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFE5E5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
   settingText: {
     fontSize: 16,
     color: "#333",
-    marginLeft: 16,
     flex: 1,
   },
   settingArrow: {
@@ -738,6 +883,9 @@ const styles = StyleSheet.create({
   },
   logoutItem: {
     borderBottomWidth: 0,
+  },
+  logoutIconContainer: {
+    backgroundColor: "#FFE5E5",
   },
   logoutText: {
     color: "#FF6B6B",
