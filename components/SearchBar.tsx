@@ -1,73 +1,132 @@
-import { StyleSheet, View, TextInput, TouchableOpacity } from "react-native"
-import { FontAwesome5 } from "@expo/vector-icons"
+import React from 'react';
+import {
+  View,
+  TextInput,
+  StyleSheet,
+  Platform,
+  Pressable,
+  Animated,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, typography, borderRadius, shadows, spacing } from '../constants/theme';
 
 interface SearchBarProps {
-  value: string
-  onChangeText: (text: string) => void
-  placeholder?: string
+  value: string;
+  onChangeText: (text: string) => void;
+  onSubmit?: () => void;
+  placeholder?: string;
+  autoFocus?: boolean;
 }
 
-export function SearchBar({ value, onChangeText, placeholder = "Search videos..." }: SearchBarProps) {
+export const SearchBar = ({
+  value,
+  onChangeText,
+  onSubmit,
+  placeholder = 'Search...',
+  autoFocus = false,
+}: SearchBarProps) => {
+  const [isFocused, setIsFocused] = React.useState(false);
+  const animatedValue = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: isFocused ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [isFocused]);
+
+  const containerStyle = {
+    transform: [
+      {
+        scale: animatedValue.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.02],
+        }),
+      },
+    ],
+    shadowOpacity: animatedValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.1, 0.2],
+    }),
+  };
+
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, containerStyle]}>
       <View style={styles.searchContainer}>
-        <FontAwesome5 name="search" size={16} color="#999" style={styles.searchIcon} />
+        <Ionicons
+          name="search"
+          size={20}
+          color={isFocused ? colors.primary[500] : colors.neutral[400]}
+          style={styles.searchIcon}
+        />
         <TextInput
-          style={styles.input}
           value={value}
           onChangeText={onChangeText}
+          onSubmitEditing={onSubmit}
           placeholder={placeholder}
-          placeholderTextColor="#999"
+          placeholderTextColor={colors.neutral[400]}
+          style={styles.input}
+          autoFocus={autoFocus}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
         />
         {value.length > 0 && (
-          <TouchableOpacity onPress={() => onChangeText("")}>
-            <FontAwesome5 name="times" size={16} color="#999" />
-          </TouchableOpacity>
+          <Pressable
+            onPress={() => onChangeText('')}
+            style={({ pressed }) => [
+              styles.clearButton,
+              pressed && styles.clearButtonPressed,
+            ]}
+          >
+            <Ionicons
+              name="close-circle"
+              size={18}
+              color={colors.neutral[400]}
+            />
+          </Pressable>
         )}
       </View>
-      <TouchableOpacity style={styles.micButton}>
-        <FontAwesome5 name="microphone" size={16} color="#666" />
-      </TouchableOpacity>
-    </View>
-  )
-}
+    </Animated.View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    marginHorizontal: spacing.base,
+    marginVertical: spacing.sm,
+    ...Platform.select({
+      ios: {
+        ...shadows.base,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   searchContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF",
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.light,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.base,
+    height: 48,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: spacing.sm,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    color: "#333",
+    fontSize: typography.fontSize.base,
+    fontFamily: typography.fontFamily.regular,
+    color: colors.neutral[900],
+    padding: 0,
   },
-  micButton: {
-    marginLeft: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F0F0F0",
-    justifyContent: "center",
-    alignItems: "center",
+  clearButton: {
+    padding: spacing.xs,
+    marginLeft: spacing.xs,
   },
-})
+  clearButtonPressed: {
+    opacity: 0.7,
+  },
+});
