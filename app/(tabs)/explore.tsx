@@ -529,11 +529,11 @@ export default function ExploreScreen() {
 
           {/* Search bar */}
           <View style={styles.searchContainer}>
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search for topics, courses, or instructors"
-            />
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search for topics, courses, or instructors"
+      />
             <TouchableOpacity style={styles.filterButton}>
               <FontAwesome5 name="sliders-h" size={16} color="#666" />
             </TouchableOpacity>
@@ -598,19 +598,19 @@ export default function ExploreScreen() {
           {/* Categories */}
           <View style={styles.categoriesContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Browse Categories</Text>
+      <Text style={styles.sectionTitle}>Browse Categories</Text>
               <TouchableOpacity>
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={CATEGORIES}
-              renderItem={renderCategoryItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesList}
-            />
+      <FlatList
+        data={CATEGORIES}
+        renderItem={renderCategoryItem}
+        keyExtractor={(item) => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoriesList}
+      />
           </View>
 
           {/* Recently viewed */}
@@ -670,17 +670,17 @@ export default function ExploreScreen() {
           {/* Trending courses */}
           <View style={styles.trendingContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Trending Courses</Text>
+      <Text style={styles.sectionTitle}>Trending Courses</Text>
               <TouchableOpacity>
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={TRENDING_COURSES}
-              renderItem={renderTrendingCourse}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.trendingList}
+      <FlatList
+        data={TRENDING_COURSES}
+        renderItem={renderTrendingCourse}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.trendingList}
               scrollEnabled={false}
             />
           </View>

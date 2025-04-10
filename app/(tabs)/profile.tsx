@@ -156,26 +156,26 @@ export default function ProfileScreen() {
         <Text style={[styles.joinDate, { color: '#FFF' }]}>Member since {USER.joinDate}</Text>
       </LinearGradient>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
           <Text style={styles.statValue}>{USER.courses}</Text>
-          <Text style={styles.statLabel}>Courses</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Courses</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
           <Text style={styles.statValue}>{USER.hours}</Text>
-          <Text style={styles.statLabel}>Hours</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Hours</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
           <Text style={styles.statValue}>{USER.certificates}</Text>
-          <Text style={styles.statLabel}>Certificates</Text>
-        </View>
-      </View>
+              <Text style={styles.statLabel}>Certificates</Text>
+            </View>
+          </View>
 
       <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-        <Text style={styles.editButtonText}>Edit Profile</Text>
-      </TouchableOpacity>
+            <Text style={styles.editButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
     </Animated.View>
   )
 
@@ -199,28 +199,28 @@ export default function ProfileScreen() {
           <Text style={styles.xpToNext}>{(USER.nextLevel - USER.xp)} XP to next level</Text>
         </LinearGradient>
       </View>
-    </View>
+        </View>
   )
 
   const renderLearningProgress = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Learning Progress</Text>
-      <View style={styles.progressCard}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Learning Progress</Text>
+          <View style={styles.progressCard}>
         <LinearGradient
           colors={['#FFF', '#F8F9FA']}
           style={styles.progressGradient}
         >
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>This Week</Text>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressTitle}>This Week</Text>
             <Text style={styles.progressValue}>{USER.weeklyProgress} hours</Text>
-          </View>
-          <View style={styles.progressBarContainer}>
+            </View>
+            <View style={styles.progressBarContainer}>
             <View style={[styles.progressBar, { width: `${(USER.weeklyProgress / USER.weeklyGoal) * 100}%` }]} />
           </View>
           <Text style={styles.progressTarget}>Target: {USER.weeklyGoal} hours</Text>
         </LinearGradient>
-      </View>
-      
+        </View>
+
       <View style={[styles.progressCard, styles.monthlyProgressCard]}>
         <LinearGradient
           colors={['#FFF', '#F8F9FA']}
@@ -240,9 +240,9 @@ export default function ProfileScreen() {
   )
 
   const renderAchievements = () => (
-    <View style={styles.section}>
+        <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Achievements</Text>
+          <Text style={styles.sectionTitle}>Achievements</Text>
         <TouchableOpacity 
           style={styles.seeAllButton}
           onPress={() => setShowAllAchievements(!showAllAchievements)}
@@ -255,7 +255,7 @@ export default function ProfileScreen() {
           />
         </TouchableOpacity>
       </View>
-      <View style={styles.achievementsContainer}>
+          <View style={styles.achievementsContainer}>
         {USER.achievements.slice(0, showAllAchievements ? undefined : 3).map((achievement) => (
           <View key={achievement.id} style={styles.achievementItem}>
             <LinearGradient
@@ -270,10 +270,10 @@ export default function ProfileScreen() {
             {!achievement.unlocked && (
               <Text style={styles.lockedText}>Locked</Text>
             )}
-          </View>
+              </View>
         ))}
-      </View>
-    </View>
+            </View>
+              </View>
   )
 
   const renderRecentActivity = () => (
@@ -291,7 +291,7 @@ export default function ProfileScreen() {
             color="#FF6B6B" 
           />
         </TouchableOpacity>
-      </View>
+            </View>
       <View style={styles.activityContainer}>
         {USER.recentActivity.slice(0, showAllActivity ? undefined : 3).map((activity) => (
           <View key={activity.id} style={styles.activityItem}>
@@ -333,19 +333,19 @@ export default function ProfileScreen() {
             <Text style={styles.interestText}>{interest}</Text>
           </View>
         ))}
-      </View>
-    </View>
+          </View>
+        </View>
   )
 
   const renderSettings = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Account Settings</Text>
-      <View style={styles.settingsContainer}>
-        <TouchableOpacity style={styles.settingItem}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account Settings</Text>
+          <View style={styles.settingsContainer}>
+            <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingIconContainer}>
             <FontAwesome5 name="bell" size={18} color="#FF6B6B" />
           </View>
-          <Text style={styles.settingText}>Notifications</Text>
+              <Text style={styles.settingText}>Notifications</Text>
           <Switch
             value={notificationsEnabled}
             onValueChange={setNotificationsEnabled}
@@ -364,15 +364,15 @@ export default function ProfileScreen() {
             trackColor={{ false: "#EAEAEA", true: "#FF6B6B" }}
             thumbColor="#FFF"
           />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingIconContainer}>
             <FontAwesome5 name="download" size={18} color="#FF6B6B" />
           </View>
-          <Text style={styles.settingText}>Downloads</Text>
-          <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
+              <Text style={styles.settingText}>Downloads</Text>
+              <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingIconContainer}>
             <FontAwesome5 name="wifi" size={18} color="#FF6B6B" />
           </View>
@@ -388,16 +388,16 @@ export default function ProfileScreen() {
           <View style={styles.settingIconContainer}>
             <FontAwesome5 name="shield-alt" size={18} color="#FF6B6B" />
           </View>
-          <Text style={styles.settingText}>Privacy</Text>
-          <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
+              <Text style={styles.settingText}>Privacy</Text>
+              <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingIconContainer}>
             <FontAwesome5 name="question-circle" size={18} color="#FF6B6B" />
           </View>
-          <Text style={styles.settingText}>Help & Support</Text>
-          <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
-        </TouchableOpacity>
+              <Text style={styles.settingText}>Help & Support</Text>
+              <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
+            </TouchableOpacity>
         <TouchableOpacity style={styles.settingItem}>
           <View style={styles.settingIconContainer}>
             <FontAwesome5 name="cog" size={18} color="#FF6B6B" />
@@ -407,12 +407,12 @@ export default function ProfileScreen() {
         </TouchableOpacity>
         <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
           <View style={[styles.settingIconContainer, styles.logoutIconContainer]}>
-            <FontAwesome5 name="sign-out-alt" size={18} color="#FF6B6B" />
+              <FontAwesome5 name="sign-out-alt" size={18} color="#FF6B6B" />
           </View>
-          <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+              <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
   )
 
   if (isLoading) {
@@ -686,13 +686,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
       },
       android: {
-        elevation: 2,
+    elevation: 2,
       },
     }),
   },
@@ -846,13 +846,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...Platform.select({
       ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
       },
       android: {
-        elevation: 2,
+    elevation: 2,
       },
     }),
   },
