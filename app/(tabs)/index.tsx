@@ -11,6 +11,7 @@ import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated"
 import { SearchBar } from "../../components/SearchBar"
 import { CategoryPills } from "../../components/CategoryPills"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
+import { useUser } from "../../contexts/UserContext"
 import {
   getAggregatedContent,
   getTrendingContent,
@@ -22,6 +23,7 @@ const CATEGORIES = ["All", "Programming", "Mathematics", "Science", "History", "
 
 export default function HomeScreen() {
   const router = useRouter()
+  const { user, profile, isLoading: userLoading } = useUser()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [videos, setVideos] = useState<AggregatedVideo[]>([])
@@ -122,7 +124,15 @@ export default function HomeScreen() {
             <FontAwesome5 name="plus" size={18} color="#666" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/profile")}>
-            <Image source="https://randomuser.me/api/portraits/men/32.jpg" style={styles.avatar} contentFit="cover" />
+            {userLoading ? (
+              <ActivityIndicator size="small" color="#FF6B6B" />
+            ) : profile?.avatar_url ? (
+              <Image source={profile.avatar_url} style={styles.avatar} contentFit="cover" />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <FontAwesome5 name="user" size={18} color="#666" />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -234,6 +244,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+  },
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F0F0F0",
+    justifyContent: "center",
+    alignItems: "center",
   },
   videoList: {
     padding: 12,

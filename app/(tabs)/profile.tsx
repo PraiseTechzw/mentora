@@ -7,46 +7,30 @@ import { useRouter } from "expo-router"
 import { LinearGradient } from "expo-linear-gradient"
 import { BlurView } from "expo-blur"
 import * as ImagePicker from "expo-image-picker"
+import { useUser } from "../../contexts/UserContext"
 
-// Mock user data
-const USER = {
-  id: "1",
-  name: "John Doe",
-  email: "john.doe@example.com",
-  avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-  bio: "Passionate about learning and sharing knowledge",
-  location: "San Francisco, CA",
-  joinDate: "January 2023",
-  courses: 24,
-  hours: 156,
-  certificates: 12,
-  streak: 7,
-  level: "Advanced",
-  xp: 1250,
-  nextLevel: 2000,
-  weeklyGoal: 12,
-  weeklyProgress: 8.5,
-  monthlyGoal: 40,
-  monthlyProgress: 28,
-  achievements: [
-    { id: "1", name: "Fast Learner", icon: "award", color: "#4361EE", unlocked: true },
-    { id: "2", name: "7 Day Streak", icon: "fire", color: "#F72585", unlocked: true },
-    { id: "3", name: "Certified", icon: "certificate", color: "#4CC9F0", unlocked: true },
-    { id: "4", name: "Night Owl", icon: "moon", color: "#7209B7", unlocked: false },
-    { id: "5", name: "Social Butterfly", icon: "users", color: "#3A0CA3", unlocked: false },
-    { id: "6", name: "Perfect Score", icon: "star", color: "#F72585", unlocked: false },
-  ],
-  recentActivity: [
-    { id: "1", type: "course", title: "Advanced React Patterns", date: "2 hours ago", icon: "book" },
-    { id: "2", type: "certificate", title: "JavaScript Mastery", date: "Yesterday", icon: "certificate" },
-    { id: "3", type: "achievement", title: "7 Day Streak", date: "3 days ago", icon: "fire" },
-  ],
-  skills: ["JavaScript", "React", "Node.js", "TypeScript", "Python"],
-  interests: ["Web Development", "Mobile Apps", "Data Science", "UI/UX Design"],
-}
+// Mock data for achievements and other UI elements
+const ACHIEVEMENTS = [
+  { id: "1", name: "Fast Learner", icon: "award", color: "#4361EE", unlocked: true },
+  { id: "2", name: "7 Day Streak", icon: "fire", color: "#F72585", unlocked: true },
+  { id: "3", name: "Certified", icon: "certificate", color: "#4CC9F0", unlocked: true },
+  { id: "4", name: "Night Owl", icon: "moon", color: "#7209B7", unlocked: false },
+  { id: "5", name: "Social Butterfly", icon: "users", color: "#3A0CA3", unlocked: false },
+  { id: "6", name: "Perfect Score", icon: "star", color: "#F72585", unlocked: false },
+]
+
+const RECENT_ACTIVITY = [
+  { id: "1", type: "course", title: "Advanced React Patterns", date: "2 hours ago", icon: "book" },
+  { id: "2", type: "certificate", title: "JavaScript Mastery", date: "Yesterday", icon: "certificate" },
+  { id: "3", type: "achievement", title: "7 Day Streak", date: "3 days ago", icon: "fire" },
+]
+
+const SKILLS = ["JavaScript", "React", "Node.js", "TypeScript", "Python"]
+const INTERESTS = ["Web Development", "Mobile Apps", "Data Science", "UI/UX Design"]
 
 export default function ProfileScreen() {
   const router = useRouter()
+  const { user, profile, isLoading: userLoading, signOut, uploadAvatar, updateProfile } = useUser()
   const scrollY = useRef(new Animated.Value(0)).current
   const [refreshing, setRefreshing] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
@@ -54,14 +38,7 @@ export default function ProfileScreen() {
   const [downloadOverWifiOnly, setDownloadOverWifiOnly] = useState(true)
   const [showAllAchievements, setShowAllAchievements] = useState(false)
   const [showAllActivity, setShowAllActivity] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    // Simulate initial loading
-    setTimeout(() => {
-      setIsLoading(false)
-    }, 1500)
-  }, [])
+  const [isUploading, setIsUploading] = useState(false)
 
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 200],
@@ -104,11 +81,20 @@ export default function ProfileScreen() {
       })
       
       if (!result.canceled) {
-        // In a real app, you would upload the image to your server
-        Alert.alert("Success", "Profile picture updated successfully!")
+        setIsUploading(true)
+        const avatarUrl = await uploadAvatar(result.assets[0].uri)
+        setIsUploading(false)
+        
+        if (avatarUrl) {
+          Alert.alert("Success", "Profile picture updated successfully!")
+        } else {
+          Alert.alert("Error", "Failed to update profile picture")
+        }
       }
     } catch (error) {
+      setIsUploading(false)
       Alert.alert("Error", "Failed to update profile picture")
+      console.error(error)
     }
   }
 
@@ -121,9 +107,14 @@ export default function ProfileScreen() {
         { 
           text: "Logout", 
           style: "destructive",
-          onPress: () => {
-            // In a real app, you would clear auth tokens and navigate to login
-            Alert.alert("Logged out", "You have been successfully logged out")
+          onPress: async () => {
+            try {
+              await signOut()
+              router.replace("/auth/login")
+            } catch (error) {
+              console.error("Error signing out:", error)
+              Alert.alert("Error", "Failed to sign out")
+            }
           }
         }
       ]
@@ -137,171 +128,102 @@ export default function ProfileScreen() {
         style={styles.headerGradient}
       >
         <View style={styles.avatarContainer}>
+          {userLoading ? (
+            <ActivityIndicator size="large" color="#FFF" />
+          ) : (
+            <>
           <Image
-            source={USER.avatar}
+                source={profile?.avatar_url || "https://randomuser.me/api/portraits/men/32.jpg"}
             style={styles.profileImage}
             contentFit="cover"
           />
-          <TouchableOpacity style={styles.changeAvatarButton} onPress={handleChangeAvatar}>
-            <Ionicons name="camera" size={16} color="#FFF" />
-          </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.changeAvatarButton} 
+                onPress={handleChangeAvatar}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Ionicons name="camera" size={16} color="#FFF" />
+                )}
+              </TouchableOpacity>
+            </>
+          )}
         </View>
-        <Text style={styles.name}>{USER.name}</Text>
-        <Text style={styles.email}>{USER.email}</Text>
-        <Text style={styles.bio}>{USER.bio}</Text>
-        <View style={styles.locationContainer}>
-          <Ionicons name="location-outline" size={16} color="#FFF" />
-          <Text style={[styles.location, { color: '#FFF' }]}>{USER.location}</Text>
-        </View>
-        <Text style={[styles.joinDate, { color: '#FFF' }]}>Member since {USER.joinDate}</Text>
+        <Text style={styles.name}>{profile?.name || "User"}</Text>
+        <Text style={styles.email}>{profile?.email || user?.email || ""}</Text>
       </LinearGradient>
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-          <Text style={styles.statValue}>{USER.courses}</Text>
-              <Text style={styles.statLabel}>Courses</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-          <Text style={styles.statValue}>{USER.hours}</Text>
-              <Text style={styles.statLabel}>Hours</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-          <Text style={styles.statValue}>{USER.certificates}</Text>
-              <Text style={styles.statLabel}>Certificates</Text>
-            </View>
-          </View>
-
-      <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
     </Animated.View>
   )
 
   const renderLevelProgress = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Level Progress</Text>
-      <View style={styles.levelCard}>
-        <LinearGradient
-          colors={['#FFF', '#F8F9FA']}
-          style={styles.levelGradient}
-        >
-          <View style={styles.levelHeader}>
-            <View style={styles.levelBadge}>
-              <Text style={styles.levelText}>Level {USER.level}</Text>
-            </View>
-            <Text style={styles.xpText}>{USER.xp} / {USER.nextLevel} XP</Text>
-          </View>
-          <View style={styles.xpBarContainer}>
-            <View style={[styles.xpBar, { width: `${(USER.xp / USER.nextLevel) * 100}%` }]} />
-          </View>
-          <Text style={styles.xpToNext}>{(USER.nextLevel - USER.xp)} XP to next level</Text>
-        </LinearGradient>
+    <View style={styles.levelContainer}>
+      <View style={styles.levelInfo}>
+        <Text style={styles.levelText}>Level 5</Text>
+        <Text style={styles.xpText}>1250 / 2000 XP</Text>
       </View>
-        </View>
-  )
-
-  const renderLearningProgress = () => (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Learning Progress</Text>
-          <View style={styles.progressCard}>
-        <LinearGradient
-          colors={['#FFF', '#F8F9FA']}
-          style={styles.progressGradient}
-        >
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>This Week</Text>
-            <Text style={styles.progressValue}>{USER.weeklyProgress} hours</Text>
-            </View>
-            <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${(USER.weeklyProgress / USER.weeklyGoal) * 100}%` }]} />
-          </View>
-          <Text style={styles.progressTarget}>Target: {USER.weeklyGoal} hours</Text>
-        </LinearGradient>
-        </View>
-
-      <View style={[styles.progressCard, styles.monthlyProgressCard]}>
-        <LinearGradient
-          colors={['#FFF', '#F8F9FA']}
-          style={styles.progressGradient}
-        >
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressTitle}>This Month</Text>
-            <Text style={styles.progressValue}>{USER.monthlyProgress} hours</Text>
-          </View>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${(USER.monthlyProgress / USER.monthlyGoal) * 100}%` }]} />
-          </View>
-          <Text style={styles.progressTarget}>Target: {USER.monthlyGoal} hours</Text>
-        </LinearGradient>
+      <View style={styles.progressBarContainer}>
+        <View style={[styles.progressBar, { width: '62.5%' }]} />
       </View>
     </View>
   )
 
-  const renderAchievements = () => (
-        <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Achievements</Text>
-        <TouchableOpacity 
-          style={styles.seeAllButton}
-          onPress={() => setShowAllAchievements(!showAllAchievements)}
-        >
-          <Text style={styles.seeAllButtonText}>{showAllAchievements ? "Show Less" : "See All"}</Text>
-          <Ionicons 
-            name={showAllAchievements ? "chevron-up" : "chevron-down"} 
-            size={16} 
-            color="#FF6B6B" 
-          />
-        </TouchableOpacity>
+  const renderLearningProgress = () => (
+    <View style={styles.progressContainer}>
+      <View style={styles.progressItem}>
+        <Text style={styles.progressValue}>24</Text>
+        <Text style={styles.progressLabel}>Courses</Text>
       </View>
-          <View style={styles.achievementsContainer}>
-        {USER.achievements.slice(0, showAllAchievements ? undefined : 3).map((achievement) => (
-          <View key={achievement.id} style={styles.achievementItem}>
-            <LinearGradient
-              colors={[achievement.color, achievement.color + '80']}
-              style={[styles.achievementIcon, { opacity: achievement.unlocked ? 1 : 0.5 }]}
-            >
-              <FontAwesome5 name={achievement.icon} size={24} color="#FFF" />
-            </LinearGradient>
-            <Text style={[styles.achievementName, !achievement.unlocked && styles.lockedAchievement]}>
-              {achievement.name}
-            </Text>
-            {!achievement.unlocked && (
-              <Text style={styles.lockedText}>Locked</Text>
-            )}
-              </View>
-        ))}
+      <View style={styles.progressDivider} />
+      <View style={styles.progressItem}>
+        <Text style={styles.progressValue}>156</Text>
+        <Text style={styles.progressLabel}>Hours</Text>
+      </View>
+      <View style={styles.progressDivider} />
+      <View style={styles.progressItem}>
+        <Text style={styles.progressValue}>12</Text>
+        <Text style={styles.progressLabel}>Certificates</Text>
+      </View>
             </View>
-              </View>
+  )
+
+  const renderAchievements = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Achievements</Text>
+        <TouchableOpacity onPress={() => setShowAllAchievements(!showAllAchievements)}>
+          <Text style={styles.seeAllText}>{showAllAchievements ? "Show Less" : "See All"}</Text>
+        </TouchableOpacity>
+            </View>
+      <View style={styles.achievementsContainer}>
+        {ACHIEVEMENTS.slice(0, showAllAchievements ? ACHIEVEMENTS.length : 3).map((achievement) => (
+          <View key={achievement.id} style={styles.achievementItem}>
+            <View style={[styles.achievementIcon, { backgroundColor: achievement.color, opacity: achievement.unlocked ? 1 : 0.5 }]}>
+              <FontAwesome5 name={achievement.icon} size={16} color="#FFF" />
+            </View>
+            <Text style={[styles.achievementName, { opacity: achievement.unlocked ? 1 : 0.5 }]}>{achievement.name}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
   )
 
   const renderRecentActivity = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <TouchableOpacity 
-          style={styles.seeAllButton}
-          onPress={() => setShowAllActivity(!showAllActivity)}
-        >
-          <Text style={styles.seeAllButtonText}>{showAllActivity ? "Show Less" : "See All"}</Text>
-          <Ionicons 
-            name={showAllActivity ? "chevron-up" : "chevron-down"} 
-            size={16} 
-            color="#FF6B6B" 
-          />
-        </TouchableOpacity>
-            </View>
+        <TouchableOpacity onPress={() => setShowAllActivity(!showAllActivity)}>
+          <Text style={styles.seeAllText}>{showAllActivity ? "Show Less" : "See All"}</Text>
+          </TouchableOpacity>
+        </View>
       <View style={styles.activityContainer}>
-        {USER.recentActivity.slice(0, showAllActivity ? undefined : 3).map((activity) => (
+        {RECENT_ACTIVITY.slice(0, showAllActivity ? RECENT_ACTIVITY.length : 3).map((activity) => (
           <View key={activity.id} style={styles.activityItem}>
-            <LinearGradient
-              colors={['#FF6B6B', '#FF8E8E']}
-              style={styles.activityIconContainer}
-            >
-              <FontAwesome5 name={activity.icon} size={16} color="#FFF" />
-            </LinearGradient>
-            <View style={styles.activityContent}>
+            <View style={styles.activityIcon}>
+              <FontAwesome5 name={activity.icon} size={16} color="#FF6B6B" />
+            </View>
+            <View style={styles.activityInfo}>
               <Text style={styles.activityTitle}>{activity.title}</Text>
               <Text style={styles.activityDate}>{activity.date}</Text>
             </View>
@@ -315,135 +237,109 @@ export default function ProfileScreen() {
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Skills</Text>
       <View style={styles.skillsContainer}>
-        {USER.skills.map((skill, index) => (
-          <View key={index} style={styles.skillBadge}>
+        {SKILLS.map((skill, index) => (
+          <View key={index} style={styles.skillItem}>
             <Text style={styles.skillText}>{skill}</Text>
           </View>
         ))}
+          </View>
+        </View>
+  )
+
+  const renderInterests = () => (
+        <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Interests</Text>
+      <View style={styles.interestsContainer}>
+        {INTERESTS.map((interest, index) => (
+          <View key={index} style={styles.interestItem}>
+            <Text style={styles.interestText}>{interest}</Text>
+          </View>
+        ))}
+              </View>
+            </View>
+  )
+
+  const renderSettings = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Settings</Text>
+      <View style={styles.settingsContainer}>
+        <View style={styles.settingItem}>
+          <View style={styles.settingInfo}>
+            <Ionicons name="notifications-outline" size={20} color="#666" />
+            <Text style={styles.settingText}>Notifications</Text>
+              </View>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={setNotificationsEnabled}
+            trackColor={{ false: "#D1D1D6", true: "#FF6B6B" }}
+            thumbColor="#FFF"
+          />
+            </View>
+        <View style={styles.settingItem}>
+          <View style={styles.settingInfo}>
+            <Ionicons name="moon-outline" size={20} color="#666" />
+            <Text style={styles.settingText}>Dark Mode</Text>
+              </View>
+          <Switch
+            value={darkModeEnabled}
+            onValueChange={setDarkModeEnabled}
+            trackColor={{ false: "#D1D1D6", true: "#FF6B6B" }}
+            thumbColor="#FFF"
+          />
+            </View>
+        <View style={styles.settingItem}>
+          <View style={styles.settingInfo}>
+            <Ionicons name="wifi-outline" size={20} color="#666" />
+            <Text style={styles.settingText}>Download over Wi-Fi only</Text>
+          </View>
+          <Switch
+            value={downloadOverWifiOnly}
+            onValueChange={setDownloadOverWifiOnly}
+            trackColor={{ false: "#D1D1D6", true: "#FF6B6B" }}
+            thumbColor="#FFF"
+          />
+        </View>
+        <TouchableOpacity style={styles.settingItem} onPress={handleEditProfile}>
+          <View style={styles.settingInfo}>
+            <Ionicons name="create-outline" size={20} color="#666" />
+            <Text style={styles.settingText}>Edit Profile</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#D1D1D6" />
+            </TouchableOpacity>
+        <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
+          <View style={styles.settingInfo}>
+            <Ionicons name="log-out-outline" size={20} color="#FF6B6B" />
+            <Text style={[styles.settingText, { color: "#FF6B6B" }]}>Logout</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#D1D1D6" />
+        </TouchableOpacity>
       </View>
     </View>
   )
 
-  const renderInterests = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Interests</Text>
-      <View style={styles.interestsContainer}>
-        {USER.interests.map((interest, index) => (
-          <View key={index} style={styles.interestBadge}>
-            <Text style={styles.interestText}>{interest}</Text>
-          </View>
-        ))}
-          </View>
-        </View>
-  )
-
-  const renderSettings = () => (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Settings</Text>
-          <View style={styles.settingsContainer}>
-            <TouchableOpacity style={styles.settingItem}>
-          <View style={styles.settingIconContainer}>
-            <FontAwesome5 name="bell" size={18} color="#FF6B6B" />
-          </View>
-              <Text style={styles.settingText}>Notifications</Text>
-          <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
-            trackColor={{ false: "#EAEAEA", true: "#FF6B6B" }}
-            thumbColor="#FFF"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
-          <View style={styles.settingIconContainer}>
-            <FontAwesome5 name="moon" size={18} color="#FF6B6B" />
-          </View>
-          <Text style={styles.settingText}>Dark Mode</Text>
-          <Switch
-            value={darkModeEnabled}
-            onValueChange={setDarkModeEnabled}
-            trackColor={{ false: "#EAEAEA", true: "#FF6B6B" }}
-            thumbColor="#FFF"
-          />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingItem}>
-          <View style={styles.settingIconContainer}>
-            <FontAwesome5 name="download" size={18} color="#FF6B6B" />
-          </View>
-              <Text style={styles.settingText}>Downloads</Text>
-              <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingItem}>
-          <View style={styles.settingIconContainer}>
-            <FontAwesome5 name="wifi" size={18} color="#FF6B6B" />
-          </View>
-          <Text style={styles.settingText}>Download over Wi-Fi only</Text>
-          <Switch
-            value={downloadOverWifiOnly}
-            onValueChange={setDownloadOverWifiOnly}
-            trackColor={{ false: "#EAEAEA", true: "#FF6B6B" }}
-            thumbColor="#FFF"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
-          <View style={styles.settingIconContainer}>
-            <FontAwesome5 name="shield-alt" size={18} color="#FF6B6B" />
-          </View>
-              <Text style={styles.settingText}>Privacy</Text>
-              <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.settingItem}>
-          <View style={styles.settingIconContainer}>
-            <FontAwesome5 name="question-circle" size={18} color="#FF6B6B" />
-          </View>
-              <Text style={styles.settingText}>Help & Support</Text>
-              <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
-            </TouchableOpacity>
-        <TouchableOpacity style={styles.settingItem}>
-          <View style={styles.settingIconContainer}>
-            <FontAwesome5 name="cog" size={18} color="#FF6B6B" />
-          </View>
-          <Text style={styles.settingText}>Preferences</Text>
-          <FontAwesome5 name="chevron-right" size={16} color="#CCC" style={styles.settingArrow} />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
-          <View style={[styles.settingIconContainer, styles.logoutIconContainer]}>
-              <FontAwesome5 name="sign-out-alt" size={18} color="#FF6B6B" />
-          </View>
-              <Text style={[styles.settingText, styles.logoutText]}>Log Out</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-  )
-
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6B6B" />
-      </View>
-    )
-  }
-
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.ScrollView 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+      <Animated.ScrollView
+        style={styles.scrollView}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: false }
         )}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#FF6B6B"]} />
+        }
       >
         {renderHeader()}
-        {renderLevelProgress()}
-        {renderLearningProgress()}
-        {renderAchievements()}
-        {renderRecentActivity()}
-        {renderSkills()}
-        {renderInterests()}
-        {renderSettings()}
+        <View style={styles.content}>
+          {renderLevelProgress()}
+          {renderLearningProgress()}
+          {renderAchievements()}
+          {renderRecentActivity()}
+          {renderSkills()}
+          {renderInterests()}
+          {renderSettings()}
+        </View>
       </Animated.ScrollView>
     </SafeAreaView>
   )
@@ -454,21 +350,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F9FA",
   },
-  loadingContainer: {
+  scrollView: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8F9FA",
   },
   header: {
-    position: "relative",
+    width: "100%",
     overflow: "hidden",
   },
   headerGradient: {
-    flex: 1,
+    width: "100%",
+    height: "100%",
     alignItems: "center",
-    paddingVertical: 24,
-    paddingHorizontal: 16,
+    justifyContent: "center",
+    paddingTop: 20,
   },
   avatarContainer: {
     position: "relative",
@@ -489,19 +383,10 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    justifyContent: "center",
     alignItems: "center",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#FFF",
   },
   name: {
     fontSize: 24,
@@ -510,97 +395,81 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   email: {
-    fontSize: 16,
-    color: "#FFF",
-    marginBottom: 8,
-  },
-  bio: {
     fontSize: 14,
-    color: "#FFF",
-    textAlign: "center",
-    marginBottom: 8,
-    paddingHorizontal: 32,
+    color: "rgba(255,255,255,0.8)",
   },
-  locationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
+  content: {
+    padding: 16,
   },
-  location: {
-    fontSize: 14,
-    marginLeft: 4,
-  },
-  joinDate: {
-    fontSize: 12,
-    marginBottom: 16,
-  },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    marginVertical: 16,
-    paddingHorizontal: 16,
+  levelContainer: {
     backgroundColor: "#FFF",
     borderRadius: 12,
-    marginHorizontal: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  statItem: {
-    alignItems: "center",
-    paddingVertical: 12,
+  levelInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  statValue: {
-    fontSize: 20,
+  levelText: {
+    fontSize: 16,
     fontWeight: "bold",
     color: "#333",
   },
-  statLabel: {
+  xpText: {
     fontSize: 14,
     color: "#666",
-    marginTop: 4,
   },
-  statDivider: {
-    width: 1,
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: "#F0F0F0",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressBar: {
     height: "100%",
-    backgroundColor: "#EAEAEA",
-  },
-  editButton: {
     backgroundColor: "#FF6B6B",
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    borderRadius: 4,
   },
-  editButtonText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "500",
+  progressContainer: {
+    flexDirection: "row",
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  progressItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  progressValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 4,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: "#666",
+  },
+  progressDivider: {
+    width: 1,
+    backgroundColor: "#F0F0F0",
+    marginHorizontal: 8,
   },
   section: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EAEAEA",
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -612,126 +481,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
-    marginBottom: 16,
   },
-  seeAllButton: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  seeAllButtonText: {
+  seeAllText: {
     fontSize: 14,
     color: "#FF6B6B",
-    fontWeight: "600",
-    marginRight: 4,
-  },
-  levelCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    overflow: "hidden",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
-  },
-  levelGradient: {
-    padding: 16,
-  },
-  levelHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  levelBadge: {
-    backgroundColor: "#FF6B6B",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  levelText: {
-    color: "#FFF",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  xpText: {
-    fontSize: 14,
-    color: "#666",
-  },
-  xpBarContainer: {
-    height: 8,
-    backgroundColor: "#EAEAEA",
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  xpBar: {
-    height: "100%",
-    backgroundColor: "#FF6B6B",
-    borderRadius: 4,
-  },
-  xpToNext: {
-    fontSize: 12,
-    color: "#666",
-    textAlign: "right",
-  },
-  progressCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    overflow: "hidden",
-    ...Platform.select({
-      ios: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-      },
-      android: {
-    elevation: 2,
-      },
-    }),
-  },
-  progressGradient: {
-    padding: 16,
-  },
-  monthlyProgressCard: {
-    marginTop: 12,
-  },
-  progressHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  progressTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-  },
-  progressValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#FF6B6B",
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: "#EAEAEA",
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: "100%",
-    backgroundColor: "#FF6B6B",
-    borderRadius: 4,
-  },
-  progressTarget: {
-    fontSize: 14,
-    color: "#666",
   },
   achievementsContainer: {
     flexDirection: "row",
@@ -739,155 +492,129 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   achievementItem: {
-    alignItems: "center",
     width: "30%",
+    alignItems: "center",
     marginBottom: 16,
   },
   achievementIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: "center",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
+    justifyContent: "center",
     marginBottom: 8,
   },
   achievementName: {
-    fontSize: 14,
-    color: "#333",
-    textAlign: "center",
-  },
-  lockedAchievement: {
-    color: "#999",
-  },
-  lockedText: {
     fontSize: 12,
-    color: "#999",
-    marginTop: 2,
+    textAlign: "center",
+    color: "#333",
   },
   activityContainer: {
     backgroundColor: "#FFF",
     borderRadius: 12,
     overflow: "hidden",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   activityItem: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#EAEAEA",
+    borderBottomColor: "#F0F0F0",
   },
-  activityIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
+  activityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,107,107,0.1)",
     alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
-  activityContent: {
+  activityInfo: {
     flex: 1,
   },
   activityTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "500",
     color: "#333",
     marginBottom: 4,
   },
   activityDate: {
     fontSize: 12,
-    color: "#999",
+    color: "#666",
   },
   skillsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
   },
-  skillBadge: {
-    backgroundColor: "#E9ECEF",
+  skillItem: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
     marginRight: 8,
     marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   skillText: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#333",
   },
   interestsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
   },
-  interestBadge: {
-    backgroundColor: "#FFE5E5",
+  interestItem: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
     marginRight: 8,
     marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   interestText: {
-    fontSize: 14,
-    color: "#FF6B6B",
+    fontSize: 12,
+    color: "#333",
   },
   settingsContainer: {
     backgroundColor: "#FFF",
     borderRadius: 12,
     overflow: "hidden",
-    ...Platform.select({
-      ios: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-      },
-      android: {
     elevation: 2,
-      },
-    }),
   },
   settingItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    justifyContent: "space-between",
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#EAEAEA",
+    borderBottomColor: "#F0F0F0",
   },
-  settingIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFE5E5",
-    justifyContent: "center",
+  settingInfo: {
+    flexDirection: "row",
     alignItems: "center",
-    marginRight: 12,
   },
   settingText: {
     fontSize: 16,
     color: "#333",
-    flex: 1,
-  },
-  settingArrow: {
-    marginLeft: "auto",
-  },
-  logoutItem: {
-    borderBottomWidth: 0,
-  },
-  logoutIconContainer: {
-    backgroundColor: "#FFE5E5",
-  },
-  logoutText: {
-    color: "#FF6B6B",
+    marginLeft: 12,
   },
 })
