@@ -35,6 +35,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     youtubeApiKey: process.env.YOUTUBE_API_KEY,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
     eas: {
       projectId: "your-project-id"
     }
