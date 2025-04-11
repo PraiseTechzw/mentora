@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Switch, Platform, Alert, RefreshControl, Image as RNImage, Animated, Dimensions } from "react-native"
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Switch, Platform, Alert, RefreshControl, Image as RNImage, Animated, Dimensions, ActivityIndicator } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
 import { FontAwesome5, Ionicons, MaterialIcons } from "@expo/vector-icons"
