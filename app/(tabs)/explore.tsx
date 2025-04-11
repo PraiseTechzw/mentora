@@ -22,6 +22,7 @@ import { useRouter } from "expo-router"
 
 import { SearchBar } from "../../components/SearchBar"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
+import { AggregatedVideo } from "../../services/content-aggregator"
 
 // Mock user data
 const USER = {
@@ -1123,11 +1124,6 @@ const styles = StyleSheet.create({
   courseTitle: {
     fontSize: 16,
     fontWeight: "600",
-    marginBottom: 4,
-  },
-  instructorName: {
-    fontSize: 14,
-    color: "#666",
     marginBottom: 4,
   },
   ratingContainer: {

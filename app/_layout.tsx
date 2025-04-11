@@ -5,6 +5,7 @@ import { useFonts } from "expo-font"
 import { useEffect } from "react"
 import { StatusBar } from "expo-status-bar"
 import * as SplashScreen from "expo-splash-screen"
+import { UserProvider } from "../contexts/UserContext"
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync()
@@ -26,7 +27,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <UserProvider>
       <StatusBar style="dark" />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -44,7 +45,31 @@ export default function RootLayout() {
             presentation: "modal",
           }}
         />
+          <Stack.Screen
+          name="onboarding/index"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="auth/login"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="auth/forgot-password"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="auth/register"
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack>
-    </>
+    </UserProvider>
   )
 }
