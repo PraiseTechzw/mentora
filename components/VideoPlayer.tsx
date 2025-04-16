@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Dimensions, Platform, Text, Animated } from 'react-native';
+import { View, StyleSheet, Dimensions, Text, Animated } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Video, ResizeMode } from 'expo-video';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 
@@ -122,11 +121,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           mediaPlaybackRequiresUserAction={false}
           allowsInlineMediaPlayback={true}
           startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#fff" />
-            </View>
-          )}
+          renderLoading={() => <LoadingAnimation />}
         />
         {isLoading && <LoadingAnimation />}
         {error && (
@@ -139,7 +134,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     );
   }
 
-  // For non-YouTube videos, use the new expo-video component
+  // For non-YouTube videos
   return (
     <View style={[styles.container, style, isFullscreen && styles.fullscreen]}>
       <Video
