@@ -100,12 +100,16 @@ function extractVideoData(data: any): any | null {
       id: videoDetails.videoId,
       title: videoDetails.title,
       description: videoDetails.shortDescription,
-      channelId: videoDetails.channelId,
+      thumbnail: getThumbnailUrl(videoDetails.videoId),
+      source: "embedded" as const,
+      videoUrl: getEmbeddedUrl(videoDetails.videoId),
+      duration: formatDuration(parseInt(videoDetails.lengthSeconds)),
+      views: formatViews(parseInt(videoDetails.viewCount)),
+      publishedAt: microformat?.publishDate || "Unknown",
       channelName: videoDetails.author,
-      viewCount: videoDetails.viewCount,
-      publishDate: microformat?.publishDate,
-      duration: videoDetails.lengthSeconds,
-      thumbnail: videoDetails.thumbnail?.thumbnails?.pop()?.url,
+      channelId: videoDetails.channelId,
+      isFree: true,
+      rating: "4.5" // Default rating, can be updated with actual data if available
     }
   } catch (error) {
     console.error("Error extracting video data:", error)
@@ -875,7 +879,7 @@ export async function fetchChannelVideos(channelId: string): Promise<AggregatedV
           views: formatViewsFromText(viewCountText),
           publishedAt: estimatePublishDate(publishedTimeText),
           channelName,
-          channelId,
+          channelId: "",
           isFree: true,
         }
       })
@@ -883,7 +887,7 @@ export async function fetchChannelVideos(channelId: string): Promise<AggregatedV
 
     return videoItems
   } catch (error) {
-    console.error(`Error fetching channel videos for ${channelId}:`, error)
+    console.error(`Error fetching channel videos:`, error)
     return []
   }
 }
