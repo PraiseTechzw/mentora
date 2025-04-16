@@ -32,6 +32,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onProgress,
   onComplete
 }) => {
+  // Add logging for initial props
+  useEffect(() => {
+    console.log('VideoPlayer mounted with props:', {
+      videoUrl,
+      thumbnailUrl,
+      title,
+      channelName,
+      autoPlay,
+      showControls
+    })
+  }, [])
+
   const [isPlaying, setIsPlaying] = useState(autoPlay)
   const [duration, setDuration] = useState(0)
   const [position, setPosition] = useState(0)
@@ -49,25 +61,49 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Check if the URL is a YouTube embed URL
   const isYouTubeEmbed = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be')
+  console.log('Video URL analysis:', {
+    originalUrl: videoUrl,
+    isYouTubeEmbed,
+    urlType: typeof videoUrl
+  })
 
   // Ensure the URL is in the correct embedded format for YouTube
   const getEmbeddedUrl = (url: string | undefined): string => {
-    if (!url) return '';
-    
-    // Extract video ID from various YouTube URL formats
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    
-    if (match && match[2].length === 11) {
-      return `https://www.youtube.com/embed/${match[2]}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1&playsinline=1`;
+    console.log('Processing URL for embedding:', url)
+    if (!url) {
+      console.log('No URL provided to getEmbeddedUrl')
+      return '';
     }
     
-    return url;
+    try {
+      // Extract video ID from various YouTube URL formats
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+      const match = url.match(regExp);
+      
+      if (match && match[2].length === 11) {
+        const embeddedUrl = `https://www.youtube.com/embed/${match[2]}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1&playsinline=1`
+        console.log('Generated YouTube embed URL:', embeddedUrl)
+        return embeddedUrl
+      }
+      
+      console.log('Using original URL as it is not a YouTube URL')
+      return url;
+    } catch (e) {
+      console.error('Error processing video URL:', e)
+      return url;
+    }
   };
 
-  const embeddedUrl = getEmbeddedUrl(videoUrl);
+  const embeddedUrl = getEmbeddedUrl(videoUrl)
+  console.log('Final embedded URL:', embeddedUrl)
 
   const handleLoad = (data: any) => {
+    console.log('Video loaded with data:', data)
+    if (!data || !data.duration) {
+      console.error('Invalid video load data:', data)
+      setError('Failed to load video')
+      return
+    }
     setDuration(data.duration)
     setIsBuffering(false)
   }
@@ -87,8 +123,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }
 
   const handleError = (error: any) => {
-    console.error('Video error:', error)
-    setError(`Video error: ${error.error?.message || 'Unknown error'}`)
+    console.error('Video error details:', {
+      error,
+      errorMessage: error?.error?.message,
+      errorCode: error?.error?.code,
+      videoUrl,
+      embeddedUrl
+    })
+    setError(`Video error: ${error?.error?.message || 'Failed to play video'}`)
   }
 
   const togglePlayPause = () => {
@@ -177,23 +219,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       <StatusBar hidden={isFullscreen} />
       <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={styles.videoWrapper}>
         {videoUrl ? (
-          <Video
-            ref={videoRef}
-            source={{ uri: videoUrl }}
-            style={styles.video}
-            resizeMode="contain"
-            paused={!isPlaying}
-            muted={isMuted}
-            volume={volume}
-            onLoad={handleLoad}
-            onProgress={handleProgress}
-            onEnd={handleEnd}
-            onError={handleError}
-            onBuffer={() => setIsBuffering(true)}
-            onLoadStart={() => setIsBuffering(true)}
-            repeat={false}
-            controls={false}
-          />
+          <>
+            <Video
+              ref={videoRef}
+              source={{ uri: videoUrl }}
+              style={styles.video}
+              resizeMode="contain"
+              paused={!isPlaying}
+              muted={isMuted}
+              volume={volume}
+              onLoad={handleLoad}
+              onProgress={handleProgress}
+              onEnd={handleEnd}
+              onError={handleError}
+              onBuffer={() => setIsBuffering(true)}
+              onLoadStart={() => setIsBuffering(true)}
+              repeat={false}
+              controls={false}
+            />
+            {console.log('Rendering Video component with source:', { uri: videoUrl })}
+          </>
         ) : (
           <View style={styles.errorContainer}>
             <BlurView intensity={70} style={styles.errorBlur}>
