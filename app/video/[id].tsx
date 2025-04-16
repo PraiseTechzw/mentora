@@ -154,8 +154,7 @@ export default function VideoScreen() {
                   solid={likeStatus === "liked"}
                 />
                 <Text style={[styles.actionText, likeStatus === "liked" && styles.activeActionText]}>
-                  {video?.views || "0"}
-                  {video?.rating || "0"}
+                  {video?.rating || video?.views || "0"}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={handleDislike}>
