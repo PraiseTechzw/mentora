@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated, Platform } from "react-native"
 import Video, { VideoRef } from 'react-native-video'
 import { FontAwesome5 } from "@expo/vector-icons"
@@ -216,36 +216,43 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return result
   }
 
+  const isValidUrl = (url: string | undefined): boolean => {
+    if (!url) return false
+    const trimmedUrl = url.trim()
+    return trimmedUrl !== "" && (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://'))
+  }
+
   return (
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
       <StatusBar hidden={isFullscreen} />
       <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={styles.videoWrapper}>
-        {videoUrl ? (
-          <>
-            <Video
-              ref={videoRef}
-              source={{ uri: videoUrl }}
-              style={styles.video}
-              resizeMode="contain"
-              paused={!isPlaying}
-              muted={isMuted}
-              volume={volume}
-              onLoad={handleLoad}
-              onProgress={handleProgress}
-              onEnd={handleEnd}
-              onError={handleError}
-              onBuffer={() => setIsBuffering(true)}
-              onLoadStart={() => setIsBuffering(true)}
-              repeat={false}
-              controls={false}
-            />
-            {console.log('Rendering Video component with source:', { uri: videoUrl })}
-          </>
+        {isValidUrl(videoUrl) ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: videoUrl }}
+            style={styles.video}
+            resizeMode="contain"
+            paused={!isPlaying}
+            muted={isMuted}
+            volume={volume}
+            onLoad={handleLoad}
+            onProgress={handleProgress}
+            onEnd={handleEnd}
+            onError={handleError}
+            onBuffer={() => setIsBuffering(true)}
+            onLoadStart={() => setIsBuffering(true)}
+            repeat={false}
+            controls={false}
+          />
         ) : (
           <View style={styles.errorContainer}>
             <BlurView intensity={70} style={styles.errorBlur}>
               <FontAwesome5 name="exclamation-triangle" size={30} color="#FF6B6B" style={styles.errorIcon} />
-              <Text style={styles.errorText}>No video source available</Text>
+              <Text style={styles.errorText}>
+                {!videoUrl ? "No video source available" : 
+                 videoUrl.trim() === "" ? "Video URL is empty" : 
+                 "Invalid video URL"}
+              </Text>
             </BlurView>
           </View>
         )}
