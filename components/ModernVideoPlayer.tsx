@@ -42,7 +42,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [volume, setVolume] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
-  const videoRef = useRef<Video>(null)
+  const videoRef = useRef<typeof Video>(null)
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
   const controlsOpacity = useRef(new Animated.Value(1)).current
   const { width, height } = Dimensions.get('window')
