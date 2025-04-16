@@ -96,7 +96,7 @@ function extractVideoData(data: any): any | null {
     const videoDetails = data.videoDetails
     const microformat = data.microformat?.playerMicroformatRenderer
 
-    return {
+  return {
       id: videoDetails.videoId,
       title: videoDetails.title,
       description: videoDetails.shortDescription,
@@ -179,7 +179,7 @@ function extractPlaylistVideos(data: any): any[] {
         // Extract published date if available
         const publishedTimeText = renderer.publishedTimeText?.simpleText || ""
 
-        return {
+  return {
           id: videoId,
           title,
           channelName,
@@ -213,7 +213,7 @@ export async function fetchPlaylistVideos(playlistId: string): Promise<Aggregate
         const details = await fetchVideoDetails(video.id)
         const extractedData = extractVideoData(details)
 
-        return {
+  return {
           id: video.id,
           title: video.title || extractedData?.title || "",
           description: extractedData?.description || "",

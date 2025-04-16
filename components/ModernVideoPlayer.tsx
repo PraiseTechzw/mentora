@@ -33,14 +33,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onProgress,
   onComplete
 }) => {
-  // For direct video playback
-  const player = useVideoPlayer(videoUrl, (player) => {
-    player.loop = false
-    player.volume = 1
-  })
-
   // State variables
-  const [isPlaying, setIsPlaying] = useState(autoPlay)
+  const [isPlaying, setIsPlaying] = useState(true)
   const [duration, setDuration] = useState(0)
   const [position, setPosition] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -59,10 +53,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const { width, height } = Dimensions.get('window')
 
   // Check if the URL is a YouTube embed URL
-  const isYouTubeEmbed = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')
+  const isYouTubeEmbed = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be')
 
   // Ensure the URL is in the correct embedded format for YouTube
   const getEmbeddedUrl = (url: string): string => {
+    if (!url) return '';
+    
     // If it's already an embedded URL, return it
     if (url.includes('youtube.com/embed/')) {
       return url;
@@ -74,7 +70,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     
     if (match && match[2].length === 11) {
       // Return embedded URL with parameters
-      return `https://www.youtube.com/embed/${match[2]}?autoplay=${autoPlay ? 1 : 0}&modestbranding=1&rel=0&enablejsapi=1&playsinline=1`;
+      return `https://www.youtube.com/embed/${match[2]}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1&playsinline=1`;
     }
     
     // If we can't extract an ID, return the original URL
@@ -92,187 +88,91 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [])
 
-  // Handle YouTube iframe API messages
-  const handleWebViewMessage = (event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data)
-      
-      if (data.event === "onStateChange") {
-        // -1: unstarted, 0: ended, 1: playing, 2: paused, 3: buffering
-        setIsPlaying(data.info === 1)
-        setIsBuffering(data.info === 3)
-        if (data.info === 0 && onComplete) {
-          onComplete()
-        }
-      } else if (data.event === "onReady") {
-        setIsBuffering(false)
-        
-        // Get duration
-        if (videoRef.current) {
-          // @ts-ignore
-          videoRef.current.injectJavaScript(`
-            const player = document.querySelector('iframe').contentWindow;
-            player.postMessage('{"event":"command","func":"getDuration","args":[]}', '*');
-            true;
-          `)
-        }
-      } else if (data.event === "getDuration") {
-        setDuration(data.value)
-      } else if (data.event === "getCurrentTime") {
-        setPosition(data.value)
-        if (onProgress && duration > 0) {
-          onProgress(data.value / duration)
-        }
-      } else if (data.event === "onError") {
-        setError(`Video error: ${data.info}`)
-      }
-    } catch (e) {
-      // Not a JSON message or not from YouTube iframe
+  // For direct video playback
+  const player = useVideoPlayer(videoUrl, (player) => {
+    if (!videoUrl) {
+      console.error('No video URL provided');
+      setError('No video URL provided');
+      return;
     }
-  }
 
-  // YouTube iframe API initialization script
-  const youtubeIframeScript = `
-    var tag = document.createElement('script');
-    tag.src = "https://www.youtube.com/iframe_api";
-    var firstScriptTag = document.getElementsByTagName('script')[0];
-    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    console.log('Video player initialized with URL:', videoUrl);
+    player.loop = false;
+    player.volume = 1;
     
-    var player;
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        events: {
-          'onReady': function(event) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({event: 'onReady'}));
-            ${autoPlay ? 'event.target.playVideo();' : ''}
-          },
-          'onStateChange': function(event) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              event: 'onStateChange',
-              info: event.data
-            }));
-          },
-          'onError': function(event) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              event: 'onError',
-              info: event.data
-            }));
-          }
-        }
-      });
-    }
-    
-    // Set up message listener for getCurrentTime and getDuration
-    window.addEventListener('message', function(event) {
+    // Use requestAnimationFrame to ensure we're on the main thread
+    requestAnimationFrame(() => {
       try {
-        const data = JSON.parse(event.data);
-        if (data.event === 'command') {
-          if (data.func === 'getCurrentTime' && player && player.getCurrentTime) {
-            const currentTime = player.getCurrentTime();
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              event: 'getCurrentTime',
-              value: currentTime
-            }));
-          } else if (data.func === 'getDuration' && player && player.getDuration) {
-            const duration = player.getDuration();
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              event: 'getDuration',
-              value: duration
-            }));
-          } else if (data.func === 'playVideo' && player && player.playVideo) {
-            player.playVideo();
-          } else if (data.func === 'pauseVideo' && player && player.pauseVideo) {
-            player.pauseVideo();
-          } else if (data.func === 'mute' && player && player.mute) {
-            player.mute();
-          } else if (data.func === 'unMute' && player && player.unMute) {
-            player.unMute();
-          } else if (data.func === 'setVolume' && player && player.setVolume) {
-            player.setVolume(data.args[0]);
-          } else if (data.func === 'seekTo' && player && player.seekTo) {
-            player.seekTo(data.args[0], true);
-          } else if (data.func === 'setPlaybackRate' && player && player.setPlaybackRate) {
-            player.setPlaybackRate(data.args[0]);
-          }
-        }
-      } catch (e) {
-        // Not a JSON message
+        player.play();
+        console.log('Video started playing');
+      } catch (error) {
+        console.error('Error starting video:', error);
+        setError(`Error starting video: ${error.message}`);
       }
     });
-    
-    // Update current time periodically
-    setInterval(function() {
-      if (player && player.getCurrentTime) {
-        const currentTime = player.getCurrentTime();
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          event: 'getCurrentTime',
-          value: currentTime
-        }));
-      }
-    }, 1000);
-    
-    true;
-  `;
+  })
 
-  // HTML content for WebView
-  const youtubeHTML = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <style>
-          body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-          }
-          iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-          }
-        </style>
-      </head>
-      <body>
-        <iframe 
-          id="player" 
-          src="${embeddedUrl}" 
-          frameborder="0" 
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-          allowfullscreen
-        ></iframe>
-      </body>
-    </html>
-  `;
+  // Handle playback status update
+  const handlePlaybackStatusUpdate = (status: any) => {
+    if (!status) {
+      console.log('Received null playback status');
+      return;
+    }
+
+    console.log('Playback status update:', {
+      isPlaying: status.isPlaying,
+      isBuffering: status.isBuffering,
+      position: status.position,
+      duration: status.duration,
+      error: status.error,
+      didJustFinish: status.didJustFinish
+    });
+
+    setIsPlaying(status.isPlaying);
+    setIsBuffering(status.isBuffering);
+
+    if (status.duration) {
+      console.log('Setting duration:', status.duration);
+      setDuration(status.duration);
+    }
+
+    if (status.position) {
+      console.log('Setting position:', status.position);
+      setPosition(status.position);
+      if (onProgress) {
+        onProgress(status.position / (status.duration || 1));
+      }
+    }
+
+    if (status.error) {
+      console.error('Video error:', status.error);
+      setError(`Video error: ${status.error}`);
+    }
+
+    if (status.didJustFinish && onComplete) {
+      console.log('Video completed');
+      onComplete();
+    }
+  };
 
   // Toggle play/pause
   const togglePlayPause = () => {
-    if (isYouTubeEmbed) {
-      if (videoRef.current) {
-        const message = isPlaying
-          ? '{"event":"command","func":"pauseVideo","args":[]}'
-          : '{"event":"command","func":"playVideo","args":[]}';
-        
-        // @ts-ignore
-        videoRef.current.injectJavaScript(`
-          const player = document.querySelector('iframe').contentWindow;
-          player.postMessage(${message}, '*');
-          true;
-        `);
+    console.log('Toggling play/pause. Current state:', { isPlaying });
+    requestAnimationFrame(() => {
+      try {
+        if (isPlaying) {
+          player.pause();
+          console.log('Video paused');
+        } else {
+          player.play();
+          console.log('Video resumed');
+        }
+        setIsPlaying(!isPlaying);
+        showControlsTemporarily();
+      } catch (error) {
+        console.error('Error toggling play/pause:', error);
       }
-    } else {
-      if (isPlaying) {
-        player.pause();
-      } else {
-        player.play();
-      }
-    }
-    
-    setIsPlaying(!isPlaying);
-    showControlsTemporarily();
+    });
   };
 
   // Toggle fullscreen
@@ -434,29 +334,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return result;
   };
 
-  // Handle playback status update for direct video playback
-  const handlePlaybackStatusUpdate = (status: any) => {
-    if (!status) return;
-
-    setIsPlaying(status.isPlaying);
-    setIsBuffering(status.isBuffering);
-
-    if (status.duration) {
-      setDuration(status.duration);
-    }
-
-    if (status.position) {
-      setPosition(status.position);
-      if (onProgress) {
-        onProgress(status.position / (status.duration || 1));
-      }
-    }
-
-    if (status.didJustFinish && onComplete) {
-      onComplete();
-    }
-  };
-
   // Replace the Slider component with a custom progress bar
   const ProgressBar = ({ progress, onSeek }: { progress: number; onSeek: (value: number) => void }) => {
     return (
@@ -484,13 +361,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             ref={videoRef}
             source={{ html: youtubeHTML }}
             style={styles.video}
-            onLoadStart={() => setIsBuffering(true)}
-            onLoadEnd={() => setIsBuffering(false)}
+            onLoadStart={() => {
+              console.log('WebView loading started');
+              setIsBuffering(true);
+            }}
+            onLoadEnd={() => {
+              console.log('WebView loading completed');
+              setIsBuffering(false);
+            }}
             onMessage={handleWebViewMessage}
             onError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
-              setError(`WebView error: ${nativeEvent.description}`);
               console.error('WebView error:', nativeEvent);
+              setError(`WebView error: ${nativeEvent.description}`);
             }}
             javaScriptEnabled={true}
             domStorageEnabled={true}
@@ -505,10 +388,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             style={styles.video}
             contentFit="contain"
             nativeControls={false}
-            onError={(error) => {
-              console.error('Video error:', error)
-              setError(`Video error: ${error.message}`)
-            }}
             onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
           />
         )}
@@ -563,9 +442,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   <FontAwesome5 name="arrow-left" size={16} color="#FFF" />
                 </TouchableOpacity>
                 <View style={styles.titleContainer}>
-                  <Text style={styles.videoTitle} numberOfLines={1}>
-                    {title}
-                  </Text>
+                <Text style={styles.videoTitle} numberOfLines={1}>
+                  {title}
+                </Text>
                   {channelName && (
                     <Text style={styles.channelName} numberOfLines={1}>
                       {channelName}
@@ -624,7 +503,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   </MotiView>
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={togglePlayPause} style={styles.centerButton}>
+              <TouchableOpacity onPress={togglePlayPause} style={styles.centerButton}>
                   <MotiView
                     animate={{ scale: isPlaying ? 1 : 1.2 }}
                     transition={{
@@ -633,14 +512,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                       easing: Easing.inOut(Easing.ease),
                     }}
                   >
-                    <FontAwesome5
-                      name={isPlaying ? "pause" : "play"}
-                      size={30}
-                      color="#FFF"
-                      style={isPlaying ? {} : { marginLeft: 4 }}
-                    />
+                <FontAwesome5
+                  name={isPlaying ? "pause" : "play"}
+                  size={30}
+                  color="#FFF"
+                  style={isPlaying ? {} : { marginLeft: 4 }}
+                />
                   </MotiView>
-                </TouchableOpacity>
+              </TouchableOpacity>
 
                 <TouchableOpacity onPress={() => skipTime(10)} style={styles.skipButton}>
                   <MotiView
