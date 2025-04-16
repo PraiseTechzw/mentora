@@ -116,8 +116,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [])
 
   // For direct video playback
-  const player = useVideoPlayer(videoUrl, (player) => {
-    if (!videoUrl) {
+  const player = useVideoPlayer(isYouTubeEmbed ? '' : videoUrl, (player) => {
+    if (!videoUrl && !isYouTubeEmbed) {
       console.error('No video URL provided');
       setError('No video URL provided');
       return;
