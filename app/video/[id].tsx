@@ -15,42 +15,12 @@ import { ModernVideoCard } from "../../components/ModernVideoCard"
 import { getAggregatedContent, type AggregatedVideo } from "../../services/content-aggregator"
 import { addToWatchHistory } from "../../services/content-service"
 
-// Mock comments data
-const COMMENTS = [
-  {
-    id: "1",
-    author: "Sarah Johnson",
-    avatar: "https://randomuser.me/api/portraits/women/33.jpg",
-    time: "2 days ago",
-    text: "This was incredibly helpful! I've been struggling with this concept and this cleared up a lot of my confusion.",
-    likes: 45,
-    replies: 3,
-  },
-  {
-    id: "2",
-    author: "Michael Chen",
-    avatar: "https://randomuser.me/api/portraits/men/85.jpg",
-    time: "1 week ago",
-    text: "Great explanation! Could you make a follow-up video on more advanced topics in this area?",
-    likes: 23,
-    replies: 1,
-  },
-  {
-    id: "3",
-    author: "Jessica Williams",
-    avatar: "https://randomuser.me/api/portraits/women/63.jpg",
-    time: "3 weeks ago",
-    text: "I've watched many tutorials on this subject, but yours is by far the clearest and most comprehensive. Thank you!",
-    likes: 87,
-    replies: 5,
-  },
-]
-
 export default function VideoScreen() {
-  const { id, source, videoUrl, thumbnailUrl } = useLocalSearchParams()
+  const params = useLocalSearchParams()
   const router = useRouter()
   const [video, setVideo] = useState<AggregatedVideo | null>(null)
   const [relatedVideos, setRelatedVideos] = useState<AggregatedVideo[]>([])
+  const [comments, setComments] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [showComments, setShowComments] = useState(false)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
@@ -62,7 +32,7 @@ export default function VideoScreen() {
 
   useEffect(() => {
     loadVideoData()
-  }, [id])
+  }, [params.id])
 
   const loadVideoData = async () => {
     setIsLoading(true)
@@ -70,16 +40,26 @@ export default function VideoScreen() {
       // In a real app, you would fetch the specific video by ID
       // For now, we'll get a list and find the one with matching ID
       const allVideos = await getAggregatedContent()
-      const videoData = allVideos.find((v) => v.id === id)
+      const videoData = allVideos.find((v) => v.id === params.id)
 
       if (videoData) {
         setVideo(videoData)
 
         // Record in watch history
-        addToWatchHistory(videoData, "0:00")
+        addToWatchHistory({
+          id: videoData.id,
+          title: videoData.title,
+          channelTitle: videoData.channelName,
+          viewCount: videoData.views,
+          duration: videoData.duration,
+          thumbnail: videoData.thumbnail,
+          description: videoData.description,
+          publishedAt: videoData.publishedAt,
+          channelId: videoData.channelId
+        }, "0:00")
 
         // Get related videos
-        const related = allVideos.filter((v) => v.id !== id).slice(0, 5)
+        const related = allVideos.filter((v) => v.id !== params.id).slice(0, 5)
         setRelatedVideos(related)
       }
     } catch (error) {
@@ -118,7 +98,17 @@ export default function VideoScreen() {
 
   const handleVideoComplete = () => {
     if (video) {
-      addToWatchHistory(video, video.duration)
+      addToWatchHistory({
+        id: video.id,
+        title: video.title,
+        channelTitle: video.channelName,
+        viewCount: video.views,
+        duration: video.duration,
+        thumbnail: video.thumbnail,
+        description: video.description,
+        publishedAt: video.publishedAt,
+        channelId: video.channelId
+      }, video.duration)
     }
   }
 
@@ -138,8 +128,8 @@ export default function VideoScreen() {
         {/* Video Player */}
         <View style={styles.videoContainer}>
           <ModernVideoPlayer
-            videoUrl={(videoUrl as string) || "https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4"}
-            thumbnailUrl={(thumbnailUrl as string) || "https://i.ytimg.com/vi/0-S5a0eXPoc/maxresdefault.jpg"}
+            videoUrl={(params.videoUrl as string) || "https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4"}
+            thumbnailUrl={(params.thumbnailUrl as string) || "https://i.ytimg.com/vi/0-S5a0eXPoc/maxresdefault.jpg"}
             title={video?.title || "Loading..."}
             onProgress={handleVideoProgress}
             onComplete={handleVideoComplete}
@@ -151,7 +141,7 @@ export default function VideoScreen() {
           <Animated.View entering={FadeIn.duration(300)}>
             <Text style={styles.videoTitle}>{video?.title || "Loading..."}</Text>
             <Text style={styles.videoMeta}>
-              {video?.viewCount || "0"} views • {video?.publishedAt || "Recently"}
+              {video?.views || "0"} views • {video?.publishedAt || "Recently"}
             </Text>
 
             {/* Action Buttons */}
@@ -164,7 +154,7 @@ export default function VideoScreen() {
                   solid={likeStatus === "liked"}
                 />
                 <Text style={[styles.actionText, likeStatus === "liked" && styles.activeActionText]}>
-                  {video?.likes || "0"}
+                  {video?.rating || "0"}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={handleDislike}>
@@ -194,13 +184,13 @@ export default function VideoScreen() {
           {/* Channel Info */}
           <Animated.View entering={FadeInUp.duration(400).delay(100)} style={styles.channelContainer}>
             <Image
-              source={video?.channelAvatar || "https://randomuser.me/api/portraits/men/32.jpg"}
+              source={video?.thumbnail || "https://randomuser.me/api/portraits/men/32.jpg"}
               style={styles.channelAvatar}
               contentFit="cover"
             />
             <View style={styles.channelInfo}>
-              <Text style={styles.channelName}>{video?.channelTitle || "Channel"}</Text>
-              <Text style={styles.subscriberCount}>{video?.subscribers || "0"} subscribers</Text>
+              <Text style={styles.channelName}>{video?.channelName || "Channel"}</Text>
+              <Text style={styles.subscriberCount}>{video?.views || "0"} subscribers</Text>
             </View>
             <TouchableOpacity
               style={[styles.subscribeButton, isSubscribed && styles.subscribedButton]}
@@ -232,7 +222,7 @@ export default function VideoScreen() {
 
             {showComments && (
               <View style={styles.commentsContainer}>
-                {COMMENTS.map((comment) => (
+                {comments.map((comment) => (
                   <View key={comment.id} style={styles.commentItem}>
                     <Image source={comment.avatar} style={styles.commentAvatar} contentFit="cover" />
                     <View style={styles.commentContent}>

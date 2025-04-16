@@ -8,6 +8,9 @@ import { FontAwesome5, Ionicons, MaterialIcons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { LinearGradient } from "expo-linear-gradient"
 import { BlurView } from "expo-blur"
+import { SearchBar } from "../../components/SearchBar"
+import { ModernVideoCard } from "../../components/ModernVideoCard"
+import { getAggregatedContent, type AggregatedVideo } from "../../services/content-aggregator"
 
 // Mock user data
 const USER = {
@@ -140,20 +143,42 @@ export default function LibraryScreen() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [showDownloaded, setShowDownloaded] = useState(false)
+  const [videos, setVideos] = useState<AggregatedVideo[]>([])
 
-  const onRefresh = useCallback(() => {
+  // Load content when component mounts or when search/category changes
+  useEffect(() => {
+    const loadContent = async () => {
+      setIsLoading(true)
+      try {
+        const content = await getAggregatedContent(searchQuery, selectedCategory)
+        setVideos(content)
+      } catch (error) {
+        console.error("Error loading content:", error)
+        setVideos([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadContent()
+  }, [searchQuery, selectedCategory])
+
+  const onRefresh = async () => {
     setRefreshing(true)
-    // Simulate data refresh
-    setTimeout(() => {
+    try {
+      const content = await getAggregatedContent()
+      setVideos(content)
+    } catch (error) {
+      console.error("Error refreshing content:", error)
+    } finally {
       setRefreshing(false)
-    }, 2000)
-  }, [])
+    }
+  }
 
-  const handleShare = async (course) => {
+  const handleShare = async (video: AggregatedVideo) => {
     try {
       await Share.share({
-        message: `Check out this amazing course: ${course.title} by ${course.instructor}`,
-        url: course.sourceUrl,
+        message: `Check out this amazing video: ${video.title}`,
+        url: video.videoUrl,
       })
     } catch (error) {
       console.error(error)

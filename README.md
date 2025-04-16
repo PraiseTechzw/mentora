@@ -1,95 +1,78 @@
-# Mentora - Educational Content Platform
+# Mentora - Educational Video Platform
 
-Mentora is a React Native application that aggregates educational content from multiple sources (YouTube, Udemy, Coursera, Khan Academy) and provides a modern UI for users to browse, watch, and manage educational content.
+A React Native mobile application for accessing educational videos and courses.
 
 ## Features
 
-- **Content Aggregation**: Browse educational content from multiple sources
-- **Modern Video Player**: Watch videos with a custom player with advanced controls
-- **Personal Library**: Save videos for later viewing
-- **Watch History**: Track your learning progress
-- **Categories**: Browse content by category
-- **Search**: Find specific educational content
-- **User Profiles**: Manage your account and preferences
-- **Authentication**: Secure sign-up and login
+- Browse educational videos
+- Search for specific topics
+- View video details
+- Watch embedded videos
+- Track learning progress
+- User authentication
+- Personalized recommendations
 
-## Tech Stack
+## Getting Started
 
-- **Frontend**: React Native, Expo
-- **Backend**: Supabase (PostgreSQL, Authentication, Storage)
-- **APIs**: YouTube Data API, Udemy API, Coursera API
-- **State Management**: React Hooks
-- **Styling**: React Native StyleSheet
+### Prerequisites
 
-## Prerequisites
-
-- Node.js (v14 or later)
+- Node.js (v14 or higher)
 - npm or yarn
 - Expo CLI
-- Supabase account
-- YouTube API key
+- iOS Simulator (for Mac) or Android Emulator
 
-## Setup Instructions
+### Installation
 
-### 1. Clone the repository
-
+1. Clone the repository:
 ```bash
 git clone https://github.com/yourusername/mentora.git
 cd mentora
 ```
 
-### 2. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-### 3. Set up environment variables
-
-Create a `.env` file in the root directory with the following variables:
-
-```
-# YouTube API Configuration
-YOUTUBE_API_KEY=your_youtube_api_key_here
-
-# Supabase Configuration
-SUPABASE_URL=your_supabase_url_here
-SUPABASE_ANON_KEY=your_supabase_anon_key_here
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
 ```
 
-### 4. Set up Supabase
+3. Create a `.env` file in the root directory with the following variables:
+```env
+SUPABASE_URL=your_supabase_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-1. Create a new project on [Supabase](https://supabase.com/)
-2. Go to the SQL Editor and run the SQL script in `supabase/schema.sql`
-3. Copy your Supabase URL and anon key to the `.env` file
-
-### 5. Run the application
-
+4. Start the development server:
 ```bash
 npm start
+# or
+yarn start
 ```
 
-This will start the Expo development server. You can then:
-- Scan the QR code with the Expo Go app on your iOS device
-- Scan the QR code with the Expo Go app on your Android device
-- Press 'a' to open on an Android emulator
-- Press 'i' to open on an iOS simulator
-- Press 'w' to open in a web browser
+5. Run on your preferred platform:
+```bash
+# For iOS
+npm run ios
+# or
+yarn ios
+
+# For Android
+npm run android
+# or
+yarn android
+```
 
 ## Project Structure
 
-- `app/`: Main application code
-  - `(tabs)/`: Tab-based navigation screens
-  - `video/`: Video player screen
-- `components/`: Reusable UI components
-- `services/`: API and data services
-  - `content-aggregator.ts`: Aggregates content from multiple sources
-  - `content-service.ts`: Manages user content (saved videos, watch history)
-  - `youtube-api.ts`: YouTube API integration
-  - `supabase-client.ts`: Supabase client initialization
-  - `supabase-service.ts`: Supabase database operations
-- `assets/`: Images, fonts, and other static assets
-- `supabase/`: Supabase configuration and SQL scripts
+```
+mentora/
+├── app/                 # App screens and navigation
+├── assets/             # Images, fonts, and other static files
+├── components/         # Reusable UI components
+├── services/           # API and business logic
+├── types/              # TypeScript type definitions
+└── utils/              # Utility functions
+```
 
 ## Contributing
 
@@ -101,11 +84,10 @@ This will start the Expo development server. You can then:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
 - [Expo](https://expo.dev/)
 - [React Native](https://reactnative.dev/)
 - [Supabase](https://supabase.com/)
-- [YouTube Data API](https://developers.google.com/youtube/v3)

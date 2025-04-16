@@ -23,6 +23,7 @@ import { useRouter } from "expo-router"
 import { SearchBar } from "../../components/SearchBar"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
 import { AggregatedVideo } from "../../services/content-aggregator"
+import { getAggregatedContent, getTrendingContent } from "../../services/content-aggregator"
 
 // Mock user data
 const USER = {
@@ -193,7 +194,7 @@ const AGGREGATED_VIDEOS: AggregatedVideo[] = [
     source: "youtube" as const,
     sourceUrl: "https://youtube.com/watch?v=0kYk9Jh7ZtY",
     videoUrl: "https://youtube.com/watch?v=0kYk9Jh7ZtY",
-    rating: 4.8,
+    rating: "4.8",
   },
   {
     id: "v2",
@@ -207,7 +208,7 @@ const AGGREGATED_VIDEOS: AggregatedVideo[] = [
     source: "udemy",
     sourceUrl: "https://udemy.com/course/example2",
     videoUrl: "https://udemy.com/course/example2",
-    rating: 4.7,
+    rating: "4.7",
   },
 ]
 
@@ -260,22 +261,35 @@ export default function ExploreScreen() {
   const [activeCategory, setActiveCategory] = useState("all")
   const scrollX = useRef(new Animated.Value(0)).current
   const [isLoading, setIsLoading] = useState(false)
+  const [videos, setVideos] = useState<AggregatedVideo[]>([])
 
-  // Simulate loading state
+  // Load content when component mounts or when search/category changes
   useEffect(() => {
-    setIsLoading(true)
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [])
+    const loadContent = async () => {
+      setIsLoading(true)
+      try {
+        const content = await getAggregatedContent(searchQuery, activeCategory)
+        setVideos(content)
+      } catch (error) {
+        console.error("Error loading content:", error)
+        setVideos([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadContent()
+  }, [searchQuery, activeCategory])
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true)
-    // Simulate data refresh
-    setTimeout(() => {
+    try {
+      const content = await getTrendingContent()
+      setVideos(content)
+    } catch (error) {
+      console.error("Error refreshing content:", error)
+    } finally {
       setRefreshing(false)
-    }, 2000)
+    }
   }
 
   const getSourceIcon = (source) => {
@@ -694,7 +708,7 @@ export default function ExploreScreen() {
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-            {AGGREGATED_VIDEOS.map((video) => (
+            {videos.map((video) => (
               <ModernVideoCard
                 key={video.id}
                 video={video}

@@ -1,7 +1,6 @@
 // Service for handling content uploads and management
 
 import { supabase } from './supabase-client'
-import type { YouTubeVideo } from './youtube-api'
 
 export interface Instructor {
   id: string

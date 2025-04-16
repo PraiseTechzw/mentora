@@ -1,333 +1,295 @@
-// Service for aggregating content from multiple sources
+// Service for aggregating embedded educational content
 
-import { searchVideos, getPopularEducationalVideos, getVideosByCategory } from "./youtube-api"
-
-// Define a common interface for all video sources
+// Define a common interface for embedded videos
 export interface AggregatedVideo {
   id: string
   title: string
   description: string
   thumbnail: string
-  channelTitle: string
-  channelId?: string
-  publishedAt: string
-  viewCount: string
-  duration: string
-  source: "youtube" | "udemy" | "coursera" | "khan-academy" | "edx" | "custom"
-  sourceUrl: string
+  source: "embedded"
   videoUrl: string
-  rating?: number
+  duration: string
+  views: string
+  publishedAt: string
+  channelName: string
+  channelId: string
+  isFree: boolean
 }
 
-// Mock data for other platforms (in a real app, these would be API calls)
-const UDEMY_COURSES = [
-  {
-    id: "udemy-1",
-    title: "Complete Python Bootcamp: From Zero to Hero in Python",
-    description:
-      "Learn Python like a Professional! Start from the basics and go all the way to creating your own applications and games!",
-    thumbnail: "https://i.ytimg.com/vi/rfscVS0vtbw/maxresdefault.jpg",
-    instructor: "Jose Portilla",
-    publishedAt: "2021-05-15",
-    students: "1.2M",
-    rating: "4.6",
-    duration: "22h 30m",
-    price: "$13.99",
-    url: "https://www.udemy.com/course/complete-python-bootcamp/",
-  },
-  {
-    id: "udemy-2",
-    title: "The Complete 2023 Web Development Bootcamp",
-    description:
-      "Become a Full-Stack Web Developer with just ONE course. HTML, CSS, Javascript, Node, React, MongoDB, Web3 and DApps",
-    thumbnail: "https://i.ytimg.com/vi/l1EssrLxt7E/maxresdefault.jpg",
-    instructor: "Dr. Angela Yu",
-    publishedAt: "2022-01-10",
-    students: "850K",
-    rating: "4.7",
-    duration: "65h 15m",
-    price: "$15.99",
-    url: "https://www.udemy.com/course/the-complete-web-development-bootcamp/",
-  },
-]
-
-const COURSERA_COURSES = [
-  {
-    id: "coursera-1",
-    title: "Machine Learning",
-    description:
-      "This course provides a broad introduction to machine learning, datamining, and statistical pattern recognition.",
-    thumbnail: "https://i.ytimg.com/vi/qeHZOdmJvFU/maxresdefault.jpg",
-    instructor: "Andrew Ng",
-    institution: "Stanford University",
-    publishedAt: "2022-03-20",
-    students: "4.8M",
-    rating: "4.9",
-    duration: "11 weeks",
-    url: "https://www.coursera.org/learn/machine-learning",
-  },
-  {
-    id: "coursera-2",
-    title: "Learning How to Learn",
-    description:
-      "This course gives you easy access to the invaluable learning techniques used by experts in art, music, literature, math, science, sports, and many other disciplines.",
-    thumbnail: "https://i.ytimg.com/vi/O96fE1E-rf8/maxresdefault.jpg",
-    instructor: "Dr. Barbara Oakley",
-    institution: "Deep Teaching Solutions",
-    publishedAt: "2021-11-05",
-    students: "3.2M",
-    rating: "4.8",
-    duration: "4 weeks",
-    url: "https://www.coursera.org/learn/learning-how-to-learn",
-  },
-]
-
-const KHAN_ACADEMY_COURSES = [
-  {
-    id: "khan-1",
-    title: "Algebra 1",
-    description: "Learn algebra 1 for free—linear equations, functions, polynomials, factoring, and more.",
-    thumbnail: "https://i.ytimg.com/vi/NybHckSEQBI/maxresdefault.jpg",
-    instructor: "Sal Khan",
-    publishedAt: "2022-08-15",
-    students: "10M+",
-    duration: "Self-paced",
-    url: "https://www.khanacademy.org/math/algebra",
-  },
-  {
-    id: "khan-2",
-    title: "Physics - Mechanics",
-    description:
-      "Learn about the physics of motion, forces, energy, and momentum. Prepare for AP® Physics 1 or introductory college mechanics.",
-    thumbnail: "https://i.ytimg.com/vi/ZM8ECpBuQYE/maxresdefault.jpg",
-    instructor: "Sal Khan",
-    publishedAt: "2022-06-10",
-    students: "5M+",
-    duration: "Self-paced",
-    url: "https://www.khanacademy.org/science/physics",
-  },
-]
-
-// Convert platform-specific data to our common format
-function convertUdemyToAggregated(course: (typeof UDEMY_COURSES)[0]): AggregatedVideo {
-  return {
-    id: course.id,
-    title: course.title,
-    description: course.description,
-    thumbnail: course.thumbnail,
-    channelTitle: course.instructor,
-    publishedAt: course.publishedAt,
-    viewCount: course.students,
-    duration: course.duration,
-    source: "udemy",
-    sourceUrl: course.url,
-    videoUrl: course.url, // In a real app, this would be a preview video URL
-    rating: parseFloat(course.rating),
-  }
+// Function to extract video ID from YouTube URL
+function extractYouTubeId(url: string): string | null {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
 }
 
-function convertCourseraToAggregated(course: (typeof COURSERA_COURSES)[0]): AggregatedVideo {
-  return {
-    id: course.id,
-    title: course.title,
-    description: course.description,
-    thumbnail: course.thumbnail,
-    channelTitle: `${course.instructor} (${course.institution})`,
-    publishedAt: course.publishedAt,
-    viewCount: course.students,
-    duration: course.duration,
-    source: "coursera",
-    sourceUrl: course.url,
-    videoUrl: course.url, // In a real app, this would be a preview video URL
-    rating: parseFloat(course.rating),
-  }
+// Function to get embedded URL from YouTube video ID
+function getEmbeddedUrl(videoId: string): string {
+  return `https://www.youtube.com/embed/${videoId}`;
 }
 
-function convertKhanAcademyToAggregated(course: (typeof KHAN_ACADEMY_COURSES)[0]): AggregatedVideo {
-  return {
-    id: course.id,
-    title: course.title,
-    description: course.description,
-    thumbnail: course.thumbnail,
-    channelTitle: course.instructor,
-    publishedAt: course.publishedAt,
-    viewCount: course.students,
-    duration: course.duration,
-    source: "khan-academy",
-    sourceUrl: course.url,
-    videoUrl: course.url, // In a real app, this would be a preview video URL
-    rating: 4.5, // Default rating for Khan Academy courses
-  }
+// Function to get thumbnail URL from YouTube video ID
+function getThumbnailUrl(videoId: string): string {
+  return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 }
 
-// Get content from all sources
-export async function getAggregatedContent(query?: string, category?: string): Promise<AggregatedVideo[]> {
-  let youtubeVideos = []
-
-  try {
-    // Get YouTube videos based on query or category
-    if (query) {
-      youtubeVideos = await searchVideos(query)
-    } else if (category) {
-      youtubeVideos = await getVideosByCategory(category)
-    } else {
-      youtubeVideos = await getPopularEducationalVideos()
-    }
-
-    // Convert YouTube videos to our common format
-    const formattedYoutubeVideos: AggregatedVideo[] = youtubeVideos.map((video) => ({
-      ...video,
-      source: "youtube",
-      sourceUrl: `https://www.youtube.com/watch?v=${video.id}`,
-      videoUrl: `https://www.youtube.com/watch?v=${video.id}`,
-    }))
-
-    // Get content from other platforms
-    // In a real app, these would be filtered by query/category
-    const udemyVideos = UDEMY_COURSES.map(convertUdemyToAggregated)
-    const courseraVideos = COURSERA_COURSES.map(convertCourseraToAggregated)
-    const khanVideos = KHAN_ACADEMY_COURSES.map(convertKhanAcademyToAggregated)
-
-    // Combine all sources
-    const allVideos = [...formattedYoutubeVideos, ...udemyVideos, ...courseraVideos, ...khanVideos]
-
-    // Filter by query if provided
-    if (query) {
-      const lowerQuery = query.toLowerCase()
-      return allVideos.filter(
-        (video) =>
-          video.title.toLowerCase().includes(lowerQuery) || video.description.toLowerCase().includes(lowerQuery),
-      )
-    }
-
-    // Filter by category if provided
-    if (category && category !== "All") {
-      const categoryMap: Record<string, string[]> = {
-        Programming: ["programming", "coding", "developer", "software", "web development"],
-        Mathematics: ["math", "mathematics", "algebra", "calculus", "geometry"],
-        Science: ["science", "physics", "chemistry", "biology", "astronomy"],
-        History: ["history", "historical", "ancient", "medieval", "modern history"],
-        Languages: ["language", "english", "spanish", "french", "german", "japanese"],
-        Arts: ["art", "drawing", "painting", "music", "design"],
-        Business: ["business", "marketing", "finance", "entrepreneurship", "management"],
+// Curated list of educational YouTube channels and playlists
+const educationalChannels = [
+  {
+    name: "freeCodeCamp",
+    channelId: "UC8butISFwT-Wl7EV0hUK0BQ",
+    playlists: [
+      {
+        name: "JavaScript Algorithms and Data Structures",
+        playlistId: "PLWKjhJtqVAbkmRvnFmOd4KhDdlK1oI9zk"
+      },
+      {
+        name: "React.js Full Course",
+        playlistId: "PLWKjhJtqVAbknyJ9nS9h-9tCrLyOb2qZR"
       }
-
-      const keywords = categoryMap[category] || [category.toLowerCase()]
-      return allVideos.filter((video) => {
-        const lowerTitle = video.title.toLowerCase()
-        const lowerDesc = video.description.toLowerCase()
-        return keywords.some((keyword) => lowerTitle.includes(keyword) || lowerDesc.includes(keyword))
-      })
-    }
-
-    return allVideos
-  } catch (error) {
-    console.error("Error aggregating content:", error)
-    return []
+    ]
+  },
+  {
+    name: "Traversy Media",
+    channelId: "UC29ju8bIPH5as8OGnQzwJyA",
+    playlists: [
+      {
+        name: "React JS Crash Course",
+        playlistId: "PLillGF-RfqbbRA-CIUxlxkUpbq0IFkX60"
+      },
+      {
+        name: "Modern JavaScript",
+        playlistId: "PLillGF-Rfqbb4ZOnsFCI4Trkso1FvWrJ2"
+      }
+    ]
+  },
+  {
+    name: "The Net Ninja",
+    channelId: "UCW5YeuERMylnzY0B_3Fw1gQ",
+    playlists: [
+      {
+        name: "React JS Tutorial",
+        playlistId: "PL4cUxeGkcC9gMfjbM1Q8YfHk1ZQ6aR5t"
+      },
+      {
+        name: "Node.js Tutorial",
+        playlistId: "PL4cUxeGkcC9gcy9l1xQYgJHnZT4dsP6bm"
+      }
+    ]
+  },
+  {
+    name: "Academind",
+    channelId: "UCSJbGtTmKr8zjfRtmPPsQtA",
+    playlists: [
+      {
+        name: "React JS Tutorial",
+        playlistId: "PL55RiY5tL51oyA8cyS04iwjTUktH4kdB_"
+      },
+      {
+        name: "JavaScript Tutorial",
+        playlistId: "PL55RiY5tL51q4D-KXw9IRX7Cy8xJ2w6gK"
+      }
+    ]
+  },
+  {
+    name: "Fireship",
+    channelId: "UCsBjURrPoezykLs9EqgamOA",
+    playlists: [
+      {
+        name: "Web Dev",
+        playlistId: "PL0vfts4VybNiQauuPqpxFzWrYkCFhS0QR"
+      },
+      {
+        name: "React",
+        playlistId: "PL0vfts4VybNxR7u8kDl0HjqoNkm3ddjgi"
+      }
+    ]
   }
-}
+];
 
-// Get trending content from all sources
-export async function getTrendingContent(): Promise<AggregatedVideo[]> {
+// Function to fetch videos from a YouTube playlist
+async function fetchPlaylistVideos(playlistId: string): Promise<AggregatedVideo[]> {
   try {
-    const youtubeVideos = await getPopularEducationalVideos(undefined, 5)
-    const formattedYoutubeVideos: AggregatedVideo[] = youtubeVideos.map((video) => ({
-      ...video,
-      source: "youtube",
-      sourceUrl: `https://www.youtube.com/watch?v=${video.id}`,
-      videoUrl: `https://www.youtube.com/watch?v=${video.id}`,
-    }))
-
-    // Get a selection from other platforms
-    const udemyVideos = UDEMY_COURSES.slice(0, 2).map(convertUdemyToAggregated)
-    const courseraVideos = COURSERA_COURSES.slice(0, 2).map(convertCourseraToAggregated)
-    const khanVideos = KHAN_ACADEMY_COURSES.slice(0, 1).map(convertKhanAcademyToAggregated)
-
-    // Combine and shuffle
-    const allVideos = [...formattedYoutubeVideos, ...udemyVideos, ...courseraVideos, ...khanVideos]
-    return shuffleArray(allVideos)
+    // Use a public YouTube playlist API that doesn't require an API key
+    const response = await fetch(`https://www.youtube.com/playlist?list=${playlistId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch playlist videos: ${response.statusText}`);
+    }
+    
+    // Extract video IDs from the playlist page
+    const html = await response.text();
+    const videoIdRegex = /"videoId":"([^"]+)"/g;
+    const matches = [...html.matchAll(videoIdRegex)];
+    
+    if (matches.length === 0) {
+      return [];
+    }
+    
+    // Create video objects from the extracted IDs
+    return matches.map((match, index) => {
+      const videoId = match[1];
+  return {
+        id: videoId,
+        title: `Video ${index + 1} from playlist`,
+        description: "Educational video from curated playlist",
+        thumbnail: getThumbnailUrl(videoId),
+        source: "embedded",
+        videoUrl: getEmbeddedUrl(videoId),
+        duration: "10:00", // Default duration
+        views: "1000", // Default views
+        publishedAt: new Date().toISOString(),
+        channelName: "Educational Channel",
+        channelId: "channel1",
+        isFree: true,
+      };
+    });
   } catch (error) {
-    console.error("Error getting trending content:", error)
-    return []
+    console.error(`Error fetching playlist videos for ${playlistId}:`, error);
+    return [];
   }
 }
 
-// Get recommended content based on user preferences
-export async function getRecommendedContent(
-  userPreferences: { categories: string[]; tags: string[] } = { categories: [], tags: [] },
+// Function to get educational videos from curated playlists
+async function getEducationalVideos(): Promise<AggregatedVideo[]> {
+  try {
+    // Get videos from the first playlist of each channel
+    const playlistPromises = educationalChannels.map(channel => 
+      fetchPlaylistVideos(channel.playlists[0].playlistId)
+    );
+    
+    const playlistResults = await Promise.all(playlistPromises);
+    
+    // Flatten and deduplicate results
+    const uniqueVideos = new Map();
+    playlistResults.flat().forEach(video => {
+      if (!uniqueVideos.has(video.id)) {
+        uniqueVideos.set(video.id, video);
+      }
+    });
+    
+    return Array.from(uniqueVideos.values());
+  } catch (error) {
+    console.error("Error getting educational videos:", error);
+    return [];
+  }
+}
+
+// Function to search for educational videos
+async function searchEducationalVideos(query: string): Promise<AggregatedVideo[]> {
+  try {
+    // For now, we'll return videos from our curated playlists
+    // In a real app, you would implement a proper search mechanism
+    const allVideos = await getEducationalVideos();
+    
+    // Filter videos based on the search query
+    const searchQuery = query.toLowerCase();
+    return allVideos.filter(video => 
+      video.title.toLowerCase().includes(searchQuery) ||
+      video.description.toLowerCase().includes(searchQuery)
+    );
+  } catch (error) {
+    console.error("Error searching educational videos:", error);
+    return [];
+  }
+}
+
+// Get aggregated content with optional search and category filters
+export async function getAggregatedContent(
+  searchQuery?: string,
+  category?: string,
+  freeOnly: boolean = true
 ): Promise<AggregatedVideo[]> {
   try {
-    const recommendedVideos: AggregatedVideo[] = []
-
-    // Get videos for each preferred category
-    for (const category of userPreferences.categories) {
-      const categoryVideos = await getVideosByCategory(category, 3)
-      const formattedVideos: AggregatedVideo[] = categoryVideos.map((video) => ({
-        ...video,
-        source: "youtube",
-        sourceUrl: `https://www.youtube.com/watch?v=${video.id}`,
-        videoUrl: `https://www.youtube.com/watch?v=${video.id}`,
-      }))
-      recommendedVideos.push(...formattedVideos)
+    let videos: AggregatedVideo[] = [];
+    
+    // Fetch content based on search query or category
+    if (searchQuery) {
+      videos = await searchEducationalVideos(searchQuery);
+    } else if (category && category !== "all") {
+      const categoryQuery = `${category} tutorial`;
+      videos = await searchEducationalVideos(categoryQuery);
+    } else {
+      videos = await getEducationalVideos();
     }
-
-    // Get videos for each preferred tag
-    for (const tag of userPreferences.tags) {
-      const tagVideos = await searchVideos(tag, 2)
-      const formattedVideos: AggregatedVideo[] = tagVideos.map((video) => ({
-        ...video,
-        source: "youtube",
-        sourceUrl: `https://www.youtube.com/watch?v=${video.id}`,
-        videoUrl: `https://www.youtube.com/watch?v=${video.id}`,
-      }))
-      recommendedVideos.push(...formattedVideos)
+    
+    // Filter by free content if requested
+    if (freeOnly) {
+      videos = videos.filter(video => video.isFree);
     }
-
-    // If no preferences, get popular videos
-    if (recommendedVideos.length === 0) {
-      const popularVideos = await getPopularEducationalVideos()
-      const formattedVideos: AggregatedVideo[] = popularVideos.map((video) => ({
-        ...video,
-        source: "youtube",
-        sourceUrl: `https://www.youtube.com/watch?v=${video.id}`,
-        videoUrl: `https://www.youtube.com/watch?v=${video.id}`,
-      }))
-      recommendedVideos.push(...formattedVideos)
-    }
-
-    // Add some content from other platforms
-    recommendedVideos.push(...UDEMY_COURSES.map(convertUdemyToAggregated))
-    recommendedVideos.push(...COURSERA_COURSES.map(convertCourseraToAggregated))
-    recommendedVideos.push(...KHAN_ACADEMY_COURSES.map(convertKhanAcademyToAggregated))
-
-    // Remove duplicates and shuffle
-    const uniqueVideos = removeDuplicates(recommendedVideos, "id")
-    return shuffleArray(uniqueVideos)
+    
+    // Sort by published date (newest first)
+    return videos.sort((a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
   } catch (error) {
-    console.error("Error getting recommended content:", error)
-    return []
+    console.error("Error aggregating content:", error);
+    return [];
   }
 }
 
-// Helper function to shuffle an array
-function shuffleArray<T>(array: T[]): T[] {
-  const newArray = [...array]
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[newArray[i], newArray[j]] = [newArray[j], newArray[i]]
+// Get trending content
+export const getTrendingContent = async (freeOnly: boolean = true): Promise<AggregatedVideo[]> => {
+  try {
+    // Get educational videos from curated playlists
+    const trendingVideos = await getEducationalVideos();
+    
+    // Filter by free content if specified
+    const filteredTrending = freeOnly 
+      ? trendingVideos.filter(video => video.isFree)
+      : trendingVideos;
+    
+    // Sort by view count (highest first)
+    return filteredTrending.sort((a, b) => {
+      const viewsA = parseInt(a.views.replace(/,/g, "")) || 0;
+      const viewsB = parseInt(b.views.replace(/,/g, "")) || 0;
+      return viewsB - viewsA;
+    });
+  } catch (error) {
+    console.error("Error getting trending content:", error);
+    return [];
   }
-  return newArray
-}
+};
 
-// Helper function to remove duplicates from an array based on a key
-function removeDuplicates<T>(array: T[], key: keyof T): T[] {
-  const seen = new Set()
-  return array.filter((item) => {
-    const value = item[key]
-    if (seen.has(value)) {
-      return false
+// Get recommended content based on user preferences
+export const getRecommendedContent = async (
+  userPreferences: string[] = [],
+  freeOnly: boolean = true
+): Promise<AggregatedVideo[]> => {
+  try {
+    let recommendedVideos: AggregatedVideo[] = [];
+    
+    // Search for each preference
+    if (userPreferences.length > 0) {
+      const searchResults = await Promise.all(
+        userPreferences.map(pref => searchEducationalVideos(pref))
+      );
+      
+      // Flatten and deduplicate results
+      const uniqueVideos = new Map();
+      searchResults.flat().forEach(video => {
+        if (!uniqueVideos.has(video.id)) {
+          uniqueVideos.set(video.id, video);
+        }
+      });
+      
+      recommendedVideos = Array.from(uniqueVideos.values());
+    } else {
+      // If no preferences, get educational videos
+      recommendedVideos = await getEducationalVideos();
     }
-    seen.add(value)
-    return true
-  })
-}
+    
+    // Filter by free content if specified
+    if (freeOnly) {
+      recommendedVideos = recommendedVideos.filter(video => video.isFree);
+    }
+    
+    // Sort by relevance (for now, just by published date)
+    return recommendedVideos.sort(
+      (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
+  } catch (error) {
+    console.error("Error getting recommended content:", error);
+    return [];
+  }
+};

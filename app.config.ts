@@ -1,5 +1,13 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
+// Load environment variables
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Missing Supabase environment variables. Please check your .env file.');
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Mentora',
@@ -34,9 +42,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     favicon: './assets/images/favicon.png'
   },
   extra: {
-    youtubeApiKey: process.env.YOUTUBE_API_KEY,
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    supabaseUrl,
+    supabaseAnonKey,
     eas: {
       projectId: "your-project-id"
     }

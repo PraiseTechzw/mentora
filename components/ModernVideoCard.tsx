@@ -28,10 +28,22 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
         return "chalkboard-teacher"
       case "coursera":
         return "graduation-cap"
-      case "khan-academy":
+      case "khan":
         return "university"
       case "edx":
         return "book"
+      case "pluralsight":
+        return "code"
+      case "linkedin":
+        return "linkedin"
+      case "mit":
+        return "flask"
+      case "openlearn":
+        return "open-book"
+      case "futurelearn":
+        return "rocket"
+      case "alison":
+        return "certificate"
       default:
         return "play-circle"
     }
@@ -45,10 +57,22 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
         return "#A435F0"
       case "coursera":
         return "#0056D2"
-      case "khan-academy":
+      case "khan":
         return "#14BF96"
       case "edx":
         return "#02262B"
+      case "pluralsight":
+        return "#F15B2A"
+      case "linkedin":
+        return "#0077B5"
+      case "mit":
+        return "#8A8B8C"
+      case "openlearn":
+        return "#2A73CC"
+      case "futurelearn":
+        return "#DE0A43"
+      case "alison":
+        return "#00A4A4"
       default:
         return "#FF6B6B"
     }
@@ -116,6 +140,13 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
         <View style={[styles.sourceBadge, { backgroundColor: getSourceColor(video.source) }]}>
           <FontAwesome5 name={getSourceIcon(video.source)} size={10} color="#FFF" />
         </View>
+        
+        {video.isFree && (
+          <View style={styles.freeBadge}>
+            <FontAwesome5 name="gift" size={10} color="#FFF" />
+            <Text style={styles.freeText}>FREE</Text>
+          </View>
+        )}
       </View>
       
       <View style={styles.infoContainer}>
@@ -124,19 +155,50 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
         </Text>
         
         <View style={styles.metadataRow}>
-          <Text style={styles.channelName}>{video.channelTitle}</Text>
+          <Text style={styles.channelName}>{video.channelName}</Text>
           
-          {video.rating && video.rating > 0 && (
+          {video.rating && (
             <View style={styles.ratingContainer}>
               <FontAwesome5 name="star" size={12} color="#FFD700" />
-              <Text style={styles.ratingText}>{video.rating.toFixed(1)}</Text>
+              <Text style={styles.ratingText}>{video.rating}</Text>
             </View>
           )}
         </View>
         
+        {(video.instructor || video.institution) && (
+          <View style={styles.instructorRow}>
+            {video.instructor && (
+              <View style={styles.instructorContainer}>
+                <FontAwesome5 name="user-tie" size={10} color="#666" />
+                <Text style={styles.instructorText} numberOfLines={1}>{video.instructor}</Text>
+              </View>
+            )}
+            
+            {video.institution && (
+              <View style={styles.institutionContainer}>
+                <FontAwesome5 name="university" size={10} color="#666" />
+                <Text style={styles.institutionText} numberOfLines={1}>{video.institution}</Text>
+              </View>
+            )}
+          </View>
+        )}
+        
         <Text style={styles.metadata}>
-          {video.viewCount} views • {formatDate(video.publishedAt)}
+          {video.views} views • {formatDate(video.publishedAt)}
         </Text>
+        
+        {video.categories && video.categories.length > 0 && (
+          <View style={styles.categoriesContainer}>
+            {video.categories.slice(0, 2).map((category, index) => (
+              <View key={index} style={styles.categoryBadge}>
+                <Text style={styles.categoryText}>{category}</Text>
+              </View>
+            ))}
+            {video.categories.length > 2 && (
+              <Text style={styles.moreCategoriesText}>+{video.categories.length - 2}</Text>
+            )}
+          </View>
+        )}
       </View>
 
       {showOptions && (
@@ -272,6 +334,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 3,
   },
+  freeBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 3,
+  },
+  freeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "600",
+    marginLeft: 4,
+  },
   infoContainer: {
     padding: 12,
   },
@@ -306,9 +386,57 @@ const styles = StyleSheet.create({
     color: "#333",
     marginLeft: 4,
   },
+  instructorRow: {
+    flexDirection: "row",
+    marginBottom: 2,
+  },
+  instructorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 12,
+    flex: 1,
+  },
+  instructorText: {
+    fontSize: 12,
+    color: "#666",
+    marginLeft: 4,
+  },
+  institutionContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  institutionText: {
+    fontSize: 12,
+    color: "#666",
+    marginLeft: 4,
+  },
   metadata: {
     fontSize: 12,
     color: "#999",
+    marginBottom: 4,
+  },
+  categoriesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 4,
+  },
+  categoryBadge: {
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  categoryText: {
+    fontSize: 10,
+    color: "#666",
+  },
+  moreCategoriesText: {
+    fontSize: 10,
+    color: "#999",
+    alignSelf: "center",
   },
   optionsOverlay: {
     position: "absolute",

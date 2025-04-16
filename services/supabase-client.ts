@@ -2,23 +2,65 @@ import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Get environment variables
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl as string;
-const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey as string;
+// Get environment variables with fallbacks
+const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl || process.env.SUPABASE_URL;
+const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey || process.env.SUPABASE_ANON_KEY;
+
+// Check if we're in development mode
+const isDevelopment = __DEV__;
+
+// Create a mock Supabase client for development when credentials are missing
+const createMockClient = () => {
+  console.warn('Using mock Supabase client in development mode');
+  return {
+    auth: {
+      signIn: async () => ({ data: { user: { id: 'mock-user' } }, error: null }),
+      signUp: async () => ({ data: { user: { id: 'mock-user' } }, error: null }),
+      signOut: async () => ({ error: null }),
+      getSession: async () => ({ data: { session: null }, error: null }),
+    },
+    from: () => ({
+      select: () => Promise.resolve({ data: [], error: null }),
+      insert: () => Promise.resolve({ data: [], error: null }),
+      update: () => Promise.resolve({ data: [], error: null }),
+      delete: () => Promise.resolve({ data: [], error: null }),
+    }),
+  };
+};
+
+// Initialize Supabase client
+let supabase;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+  if (isDevelopment) {
+    console.warn('Missing Supabase environment variables. Using mock client in development mode.');
+    supabase = createMockClient();
+  } else {
+    throw new Error(
+      'Missing Supabase environment variables. Please check your configuration in app.config.ts and .env file.'
+    );
+  }
+} else {
+  try {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    });
+  } catch (error) {
+    if (isDevelopment) {
+      console.error('Failed to create Supabase client:', error);
+      supabase = createMockClient();
+    } else {
+      throw new Error('Failed to initialize Supabase client. Please check your configuration.');
+    }
+  }
 }
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+export { supabase };
 
 // Database types
 export type Json =
