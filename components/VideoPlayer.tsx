@@ -26,13 +26,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(autoPlay);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [showControlsOverlay, setShowControlsOverlay] = useState(true);
   const [volumeLevel, setVolumeLevel] = useState(1);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const player = useVideoPlayer(videoUrl, (player) => {
     if (autoPlay) {
