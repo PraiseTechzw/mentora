@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated } from "react-native"
-import { Video, ResizeMode, type AVPlaybackStatus } from "expo-av"
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated, Platform, ViewStyle, TextStyle } from "react-native"
+import { VideoView, useVideoPlayer } from "expo-video"
 import { FontAwesome5 } from "@expo/vector-icons"
 import Slider from "@react-native-community/slider"
 import * as ScreenOrientation from "expo-screen-orientation"
 import { StatusBar } from "expo-status-bar"
 import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
+import { MotiView } from "moti"
+import { Easing } from "react-native-reanimated"
 
 interface ModernVideoPlayerProps {
   videoUrl: string
@@ -17,9 +20,201 @@ interface ModernVideoPlayerProps {
   onComplete?: () => void
 }
 
+interface Styles {
+  container: ViewStyle
+  fullscreenContainer: ViewStyle
+  videoWrapper: ViewStyle
+  video: ViewStyle
+  bufferingContainer: ViewStyle
+  bufferingBlur: ViewStyle
+  spinnerIcon: ViewStyle
+  bufferingText: TextStyle
+  controlsContainer: ViewStyle
+  topGradient: ViewStyle
+  bottomGradient: ViewStyle
+  controlsBlur: ViewStyle
+  topControls: ViewStyle
+  backButton: ViewStyle
+  videoTitle: TextStyle
+  topRightControls: ViewStyle
+  controlButton: ViewStyle
+  speedText: TextStyle
+  speedOptionsContainer: ViewStyle
+  speedOption: ViewStyle
+  activeSpeedOption: ViewStyle
+  speedOptionText: TextStyle
+  activeSpeedOptionText: TextStyle
+  centerButton: ViewStyle
+  bottomControls: ViewStyle
+  timeText: TextStyle
+  slider: ViewStyle
+  fullscreenButton: ViewStyle
+}
+
+const styles = StyleSheet.create<Styles>({
+  container: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    backgroundColor: "#000",
+    borderRadius: 12,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  fullscreenContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+    borderRadius: 0,
+  },
+  videoWrapper: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  video: {
+    width: "100%",
+    height: "100%",
+  },
+  bufferingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bufferingBlur: {
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  spinnerIcon: {
+    marginBottom: 10,
+  },
+  bufferingText: {
+    color: "#FFF",
+    fontSize: 16,
+  },
+  controlsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
+  },
+  topGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+  },
+  bottomGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+  },
+  controlsBlur: {
+    flex: 1,
+    padding: 16,
+  },
+  topControls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  backButton: {
+    padding: 8,
+  },
+  videoTitle: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "bold",
+    flex: 1,
+    marginHorizontal: 16,
+  },
+  topRightControls: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  controlButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  speedText: {
+    color: "#FFF",
+    fontSize: 14,
+  },
+  speedOptionsContainer: {
+    position: "absolute",
+    top: 50,
+    right: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    borderRadius: 8,
+    padding: 8,
+  },
+  speedOption: {
+    padding: 8,
+  },
+  activeSpeedOption: {
+    backgroundColor: "rgba(255, 107, 107, 0.3)",
+    borderRadius: 4,
+  },
+  speedOptionText: {
+    color: "#FFF",
+    fontSize: 14,
+  },
+  activeSpeedOptionText: {
+    color: "#FF6B6B",
+  },
+  centerButton: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: [{ translateX: -25 }, { translateY: -25 }],
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bottomControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 8,
+  },
+  timeText: {
+    color: "#FFF",
+    fontSize: 12,
+    width: 50,
+    textAlign: "center",
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+    marginHorizontal: 8,
+  },
+  fullscreenButton: {
+    padding: 8,
+  },
+})
+
 export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, onComplete }: ModernVideoPlayerProps) {
-  const videoRef = useRef<Video>(null)
-  const [status, setStatus] = useState<AVPlaybackStatus | null>(null)
+  const player = useVideoPlayer(videoUrl, (player) => {
+    player.loop = false
+    player.volume = 1
+  })
+
   const [isPlaying, setIsPlaying] = useState(false)
   const [duration, setDuration] = useState(0)
   const [position, setPosition] = useState(0)
@@ -29,6 +224,7 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
   const [isMuted, setIsMuted] = useState(false)
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
   const [showSpeedOptions, setShowSpeedOptions] = useState(false)
+  const [volume, setVolume] = useState(1)
 
   const controlsOpacity = useRef(new Animated.Value(1)).current
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
@@ -42,12 +238,10 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
   }, [])
 
   const togglePlayPause = async () => {
-    if (!videoRef.current) return
-
     if (isPlaying) {
-      await videoRef.current.pauseAsync()
+      player.pause()
     } else {
-      await videoRef.current.playAsync()
+      player.play()
     }
     setIsPlaying(!isPlaying)
     showControlsTemporarily()
@@ -64,27 +258,26 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
   }
 
   const toggleMute = async () => {
-    if (!videoRef.current) return
-    await videoRef.current.setIsMutedAsync(!isMuted)
+    const newVolume = isMuted ? volume : 0
+    player.volume = newVolume
     setIsMuted(!isMuted)
     showControlsTemporarily()
   }
 
-  const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return
+  const handlePlaybackStatusUpdate = (status: any) => {
+    if (!status) return
 
-    setStatus(status)
     setIsPlaying(status.isPlaying)
     setIsBuffering(status.isBuffering)
 
-    if (status.durationMillis) {
-      setDuration(status.durationMillis / 1000)
+    if (status.duration) {
+      setDuration(status.duration)
     }
 
-    if (status.positionMillis) {
-      setPosition(status.positionMillis / 1000)
+    if (status.position) {
+      setPosition(status.position)
       if (onProgress) {
-        onProgress(status.positionMillis / (status.durationMillis || 1))
+        onProgress(status.position / (status.duration || 1))
       }
     }
 
@@ -94,9 +287,8 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
   }
 
   const handleSliderValueChange = async (value: number) => {
-    if (!videoRef.current) return
     const newPosition = value * duration
-    await videoRef.current.setPositionAsync(newPosition * 1000)
+    player.currentTime = newPosition
     setPosition(newPosition)
     showControlsTemporarily()
   }
@@ -143,8 +335,7 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
   }
 
   const setPlaybackRate = async (rate: number) => {
-    if (!videoRef.current) return
-    await videoRef.current.setRateAsync(rate, true)
+    player.playbackRate = rate
     setPlaybackSpeed(rate)
     setShowSpeedOptions(false)
     showControlsTemporarily()
@@ -167,29 +358,43 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer]}>
       <StatusBar hidden={isFullscreen} />
       <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={styles.videoWrapper}>
-        <Video
-          ref={videoRef}
-          source={{ uri: videoUrl }}
+        <VideoView
+          player={player}
           style={styles.video}
-          resizeMode={ResizeMode.CONTAIN}
-          onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-          useNativeControls={false}
-          posterSource={{ uri: thumbnailUrl }}
-          posterStyle={styles.poster}
-          usePoster={true}
+          contentFit="contain"
+          nativeControls={false}
+          onFullscreenEnter={() => setIsFullscreen(true)}
+          onFullscreenExit={() => setIsFullscreen(false)}
         />
 
         {isBuffering && (
-          <View style={styles.bufferingContainer}>
+          <MotiView
+            style={styles.bufferingContainer}
+            from={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{
+              type: "timing",
+              duration: 300,
+              easing: Easing.inOut(Easing.ease),
+            }}
+          >
             <BlurView intensity={50} style={styles.bufferingBlur}>
               <FontAwesome5 name="spinner" size={24} color="#FFF" style={styles.spinnerIcon} />
               <Text style={styles.bufferingText}>Loading...</Text>
             </BlurView>
-          </View>
+          </MotiView>
         )}
 
         {showControls && (
           <Animated.View style={[styles.controlsContainer, { opacity: controlsOpacity }]}>
+            <LinearGradient
+              colors={["rgba(0,0,0,0.8)", "transparent"]}
+              style={styles.topGradient}
+            />
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.8)"]}
+              style={styles.bottomGradient}
+            />
             <BlurView intensity={40} style={styles.controlsBlur}>
               {/* Top controls */}
               <View style={styles.topControls}>
@@ -211,7 +416,16 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
 
               {/* Speed options */}
               {showSpeedOptions && (
-                <View style={styles.speedOptionsContainer}>
+                <MotiView
+                  style={styles.speedOptionsContainer}
+                  from={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{
+                    type: "timing",
+                    duration: 200,
+                    easing: Easing.inOut(Easing.ease),
+                  }}
+                >
                   {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((speed) => (
                     <TouchableOpacity
                       key={speed}
@@ -223,17 +437,26 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </View>
+                </MotiView>
               )}
 
               {/* Center play/pause button */}
               <TouchableOpacity onPress={togglePlayPause} style={styles.centerButton}>
-                <FontAwesome5
-                  name={isPlaying ? "pause" : "play"}
-                  size={30}
-                  color="#FFF"
-                  style={isPlaying ? {} : { marginLeft: 4 }}
-                />
+                <MotiView
+                  animate={{ scale: isPlaying ? 1 : 1.2 }}
+                  transition={{
+                    type: "timing",
+                    duration: 200,
+                    easing: Easing.inOut(Easing.ease),
+                  }}
+                >
+                  <FontAwesome5
+                    name={isPlaying ? "pause" : "play"}
+                    size={30}
+                    color="#FFF"
+                    style={isPlaying ? {} : { marginLeft: 4 }}
+                  />
+                </MotiView>
               </TouchableOpacity>
 
               {/* Bottom controls */}
@@ -261,154 +484,3 @@ export function ModernVideoPlayer({ videoUrl, thumbnailUrl, title, onProgress, o
     </View>
   )
 }
-
-const { width, height } = Dimensions.get("window")
-
-const styles = StyleSheet.create({
-  container: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    backgroundColor: "#000",
-    position: "relative",
-  },
-  fullscreenContainer: {
-    width: height,
-    height: width,
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
-  },
-  videoWrapper: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  video: {
-    width: "100%",
-    height: "100%",
-  },
-  poster: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  controlsContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "space-between",
-    padding: 16,
-  },
-  controlsBlur: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "space-between",
-    padding: 16,
-  },
-  topControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  backButton: {
-    padding: 8,
-  },
-  videoTitle: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "600",
-    flex: 1,
-    marginHorizontal: 12,
-    textShadowColor: "rgba(0, 0, 0, 0.75)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  topRightControls: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  controlButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  speedText: {
-    color: "#FFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  speedOptionsContainer: {
-    position: "absolute",
-    top: 60,
-    right: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    borderRadius: 8,
-    padding: 8,
-    zIndex: 10,
-  },
-  speedOption: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-  },
-  activeSpeedOption: {
-    backgroundColor: "#FF6B6B",
-  },
-  speedOptionText: {
-    color: "#FFF",
-    fontSize: 14,
-  },
-  activeSpeedOptionText: {
-    fontWeight: "600",
-  },
-  centerButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "center",
-  },
-  bottomControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-  },
-  timeText: {
-    color: "#FFF",
-    fontSize: 12,
-    textShadowColor: "rgba(0, 0, 0, 0.75)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  slider: {
-    flex: 1,
-    marginHorizontal: 8,
-    height: 40,
-  },
-  fullscreenButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  bufferingContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bufferingBlur: {
-    width: 120,
-    height: 80,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  bufferingText: {
-    color: "#FFF",
-    marginTop: 8,
-    fontSize: 14,
-  },
-  spinnerIcon: {
-    transform: [{ rotate: "0deg" }],
-  },
-})
