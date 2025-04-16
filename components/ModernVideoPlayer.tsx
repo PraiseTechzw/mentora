@@ -10,6 +10,33 @@ import { LinearGradient } from "expo-linear-gradient"
 import { MotiView } from "moti"
 import { Easing } from "react-native-reanimated"
 
+const youtubeHTML = `
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      body { margin: 0; background: #000; }
+      iframe { width: 100%; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <iframe
+      src="\${videoUrl}"
+      frameborder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen
+    ></iframe>
+  </body>
+</html>
+`;
+
+const youtubeIframeScript = `
+  window.addEventListener('message', function(event) {
+    window.ReactNativeWebView.postMessage(event.data);
+  });
+`;
+
 interface VideoPlayerProps {
   videoUrl: string
   thumbnailUrl?: string
@@ -350,6 +377,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </View>
       </TouchableOpacity>
     );
+  };
+
+  const handleWebViewMessage = (event: any) => {
+    const data = JSON.parse(event.nativeEvent.data);
+    if (data.event === 'onStateChange') {
+      setIsBuffering(data.info === 'buffering');
+    }
   };
 
   return (
