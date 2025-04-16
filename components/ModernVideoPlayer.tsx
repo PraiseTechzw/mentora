@@ -64,14 +64,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   console.log('Video URL analysis:', {
     originalUrl: videoUrl,
     isYouTubeEmbed,
-    urlType: typeof videoUrl
+    urlType: typeof videoUrl,
+    isEmpty: videoUrl === "",
+    isNullOrUndefined: videoUrl == null
   })
 
   // Ensure the URL is in the correct embedded format for YouTube
   const getEmbeddedUrl = (url: string | undefined): string => {
     console.log('Processing URL for embedding:', url)
-    if (!url) {
-      console.log('No URL provided to getEmbeddedUrl')
+    if (!url || url.trim() === "") {
+      console.log('Empty or invalid URL provided to getEmbeddedUrl')
       return '';
     }
     
