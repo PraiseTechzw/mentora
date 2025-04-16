@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Text, Animated } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { Video, ResizeMode } from 'expo-video';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 
@@ -21,7 +21,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const videoRef = useRef(null);
+  const videoRef = useRef<Video>(null);
   const { width } = Dimensions.get('window');
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -47,43 +47,61 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [isLoading]);
 
+  useEffect(() => {
+    const loadVideo = async () => {
+      if (videoRef.current) {
+        try {
+          await videoRef.current.loadAsync(
+            { uri: videoUrl },
+            { shouldPlay: autoPlay },
+            false
+          );
+        } catch (error) {
+          console.error('Error loading video:', error);
+          setError('Failed to load video');
+        }
+      }
+    };
+
+    loadVideo();
+
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.unloadAsync();
+      }
+    };
+  }, [videoUrl, autoPlay]);
+
+  // Handle fullscreen changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', () => {
+      const { width, height } = Dimensions.get('window');
+      setIsFullscreen(width > height);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
   // Ensure the URL is in the correct embedded format
   const getEmbeddedUrl = (url: string): string => {
-    // If it's already an embedded URL, return it
     if (url.includes('youtube.com/embed/')) {
       return url;
     }
     
-    // Extract video ID from various YouTube URL formats
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     
     if (match && match[2].length === 11) {
-      // Return embedded URL with autoplay and modestbranding
       return `https://www.youtube.com/embed/${match[2]}?autoplay=${autoPlay ? 1 : 0}&modestbranding=1&rel=0`;
     }
     
-    // If we can't extract an ID, return the original URL
     return url;
   };
 
   const embeddedUrl = getEmbeddedUrl(videoUrl);
-
-  // Check if the URL is a YouTube embed URL
   const isYouTubeEmbed = embeddedUrl.includes('youtube.com/embed');
-
-  // Handle fullscreen changes
-  useEffect(() => {
-    const handleOrientationChange = () => {
-      const { width, height } = Dimensions.get('window');
-      setIsFullscreen(width > height);
-    };
-
-    Dimensions.addEventListener('change', handleOrientationChange);
-    return () => {
-      Dimensions.removeEventListener('change', handleOrientationChange);
-    };
-  }, []);
 
   const LoadingAnimation = () => (
     <BlurView intensity={20} style={styles.loadingContainer}>
@@ -105,7 +123,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return (
       <View style={[styles.container, style, isFullscreen && styles.fullscreen]}>
         <WebView
-          ref={videoRef}
           source={{ uri: embeddedUrl }}
           style={styles.webview}
           onLoadStart={() => setIsLoading(true)}
@@ -113,7 +130,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             setError(`WebView error: ${nativeEvent.description}`);
-            console.error('WebView error:', nativeEvent);
           }}
           allowsFullscreenVideo
           javaScriptEnabled
@@ -134,22 +150,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     );
   }
 
-  // For non-YouTube videos
   return (
     <View style={[styles.container, style, isFullscreen && styles.fullscreen]}>
       <Video
         ref={videoRef}
-        source={{ uri: videoUrl }}
         style={styles.video}
         resizeMode={ResizeMode.CONTAIN}
         useNativeControls={showControls}
         isLooping={false}
-        shouldPlay={autoPlay}
         onLoadStart={() => setIsLoading(true)}
-        onLoad={() => setIsLoading(false)}
-        onError={(error) => {
-          console.error('Video error:', error);
-          setError(`Video error: ${error.error}`);
+        onLoad={(status: AVPlaybackStatus) => {
+          setIsLoading(false);
+          if (status.isLoaded && autoPlay) {
+            videoRef.current?.playAsync().catch(error => {
+              console.error('Error playing video:', error);
+              setError('Failed to play video');
+            });
+          }
+        }}
+        onError={() => {
+          setError('Failed to load video');
         }}
       />
       {isLoading && <LoadingAnimation />}
