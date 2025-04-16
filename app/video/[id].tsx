@@ -12,9 +12,9 @@ import * as Haptics from "expo-haptics"
 
 import { ModernVideoPlayer } from "../../components/ModernVideoPlayer"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
-import { getAggregatedContent, type AggregatedVideo } from "../../services/content-aggregator"
 import { addToWatchHistory } from "../../services/content-service"
-
+import { AggregatedVideo } from "../../types/videoag"
+import { getAggregatedContent } from "../../services/content-aggregator"
 export default function VideoScreen() {
   const params = useLocalSearchParams()
   const router = useRouter()
@@ -128,8 +128,8 @@ export default function VideoScreen() {
         {/* Video Player */}
         <View style={styles.videoContainer}>
           <ModernVideoPlayer
-            videoUrl={(params.videoUrl as string) || "https://d23dyxeqlo5psv.cloudfront.net/big_buck_bunny.mp4"}
-            thumbnailUrl={(params.thumbnailUrl as string) || "https://i.ytimg.com/vi/0-S5a0eXPoc/maxresdefault.jpg"}
+            videoUrl={video?.videoUrl || ""}
+            thumbnailUrl={video?.thumbnail || ""}
             title={video?.title || "Loading..."}
             onProgress={handleVideoProgress}
             onComplete={handleVideoComplete}
@@ -154,6 +154,7 @@ export default function VideoScreen() {
                   solid={likeStatus === "liked"}
                 />
                 <Text style={[styles.actionText, likeStatus === "liked" && styles.activeActionText]}>
+                  {video?.views || "0"}
                   {video?.rating || "0"}
                 </Text>
               </TouchableOpacity>

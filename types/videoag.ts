@@ -11,4 +11,5 @@ export interface AggregatedVideo {
     channelName: string;
     channelId: string;
     isFree: boolean;
+    rating?: string;
   }
