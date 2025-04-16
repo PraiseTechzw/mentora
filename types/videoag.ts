@@ -12,4 +12,7 @@ export interface AggregatedVideo {
     channelId: string;
     isFree: boolean;
     rating?: string;
-  }
+    instructor?: string;
+    institution?: string;
+    categories?: string[];
+}

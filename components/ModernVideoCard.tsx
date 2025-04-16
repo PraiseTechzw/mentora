@@ -5,8 +5,8 @@ import { StyleSheet, View, Text, TouchableOpacity, Pressable, ActivityIndicator,
 import { Image } from "expo-image"
 import { FontAwesome5 } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
-import type { AggregatedVideo } from "../services/content-aggregator"
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
+import { AggregatedVideo } from "../types/videoag"
 
 interface ModernVideoCardProps {
   video: AggregatedVideo

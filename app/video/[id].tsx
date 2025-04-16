@@ -10,11 +10,11 @@ import Animated, { FadeInUp, FadeIn } from "react-native-reanimated"
 import { BlurView } from "expo-blur"
 import * as Haptics from "expo-haptics"
 
-import { ModernVideoPlayer } from "../../components/ModernVideoPlayer"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
 import { addToWatchHistory } from "../../services/content-service"
 import { AggregatedVideo } from "../../types/videoag"
 import { getAggregatedContent } from "../../services/content-aggregator"
+import { VideoPlayer } from "../../components/ModernVideoPlayer"
 export default function VideoScreen() {
   const params = useLocalSearchParams()
   const router = useRouter()
@@ -127,7 +127,7 @@ export default function VideoScreen() {
       <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
         {/* Video Player */}
         <View style={styles.videoContainer}>
-          <ModernVideoPlayer
+          <VideoPlayer
             videoUrl={video?.videoUrl || ""}
             thumbnailUrl={video?.thumbnail || ""}
             title={video?.title || "Loading..."}
