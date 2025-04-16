@@ -83,28 +83,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const isYouTubeEmbed = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be')
 
   // Ensure the URL is in the correct embedded format for YouTube
-  const getEmbeddedUrl = (url: string): string => {
+  const getEmbeddedUrl = (url: string | undefined): string => {
     if (!url) return '';
-    
-    // If it's already an embedded URL, return it
-    if (url.includes('youtube.com/embed/')) {
-      return url;
-    }
     
     // Extract video ID from various YouTube URL formats
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     
     if (match && match[2].length === 11) {
-      // Return embedded URL with parameters
       return `https://www.youtube.com/embed/${match[2]}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1&playsinline=1`;
     }
     
-    // If we can't extract an ID, return the original URL
     return url;
   };
 
-  const embeddedUrl = isYouTubeEmbed ? getEmbeddedUrl(videoUrl) : videoUrl;
+  const embeddedUrl = getEmbeddedUrl(videoUrl);
 
   // Clean up on unmount
   useEffect(() => {
@@ -116,30 +109,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [])
 
   // For direct video playback
-  const player = useVideoPlayer(isYouTubeEmbed ? '' : videoUrl, (player) => {
-    if (!videoUrl && !isYouTubeEmbed) {
-      console.error('No video URL provided');
-      setError('No video URL provided');
-      return;
-    }
-
-    // Only initialize the video player for non-YouTube URLs
-    if (!isYouTubeEmbed) {
-      console.log('Video player initialized with URL:', videoUrl);
+  const player = useVideoPlayer('', (player) => {
+    // Only initialize for non-YouTube videos with a valid URL
+    if (!isYouTubeEmbed && videoUrl) {
       player.loop = false;
       player.volume = 1;
       
       requestAnimationFrame(() => {
         try {
           player.play();
-          console.log('Video started playing');
         } catch (error) {
           console.error('Error starting video:', error);
-          setError(`Error starting video: ${error.message}`);
         }
       });
     }
-  })
+  });
+
+  // Show error only if we have no URL and it's not a YouTube video
+  useEffect(() => {
+    if (!videoUrl && !isYouTubeEmbed) {
+      setError('No video URL provided');
+    } else {
+      setError(null);
+    }
+  }, [videoUrl, isYouTubeEmbed]);
 
   // Handle playback status update
   const handlePlaybackStatusUpdate = (status: any) => {
