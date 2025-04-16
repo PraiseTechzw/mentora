@@ -422,10 +422,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             style={styles.video}
             contentFit="contain"
             nativeControls={false}
-            onError={(error) => {
-              console.error('Video error:', error);
-              setError(`Video error: ${error.message}`);
-            }}
           />
         )}
 
