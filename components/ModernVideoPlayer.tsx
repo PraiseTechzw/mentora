@@ -123,20 +123,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return;
     }
 
-    console.log('Video player initialized with URL:', videoUrl);
-    player.loop = false;
-    player.volume = 1;
-    
-    // Use requestAnimationFrame to ensure we're on the main thread
-    requestAnimationFrame(() => {
-      try {
-        player.play();
-        console.log('Video started playing');
-      } catch (error) {
-        console.error('Error starting video:', error);
-        setError(`Error starting video: ${error.message}`);
-      }
-    });
+    // Only initialize the video player for non-YouTube URLs
+    if (!isYouTubeEmbed) {
+      console.log('Video player initialized with URL:', videoUrl);
+      player.loop = false;
+      player.volume = 1;
+      
+      requestAnimationFrame(() => {
+        try {
+          player.play();
+          console.log('Video started playing');
+        } catch (error) {
+          console.error('Error starting video:', error);
+          setError(`Error starting video: ${error.message}`);
+        }
+      });
+    }
   })
 
   // Handle playback status update
@@ -393,7 +395,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         {isYouTubeEmbed ? (
           <WebView
             ref={videoRef}
-            source={{ html: youtubeHTML }}
+            source={{ html: youtubeHTML.replace('${videoUrl}', embeddedUrl) }}
             style={styles.video}
             onLoadStart={() => {
               console.log('WebView loading started');
