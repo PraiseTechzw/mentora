@@ -1,473 +1,550 @@
-"use client"
-
-import { useState } from "react"
-import { StyleSheet, View, Text, TouchableOpacity, Pressable, ActivityIndicator, Platform } from "react-native"
-import { Image } from "expo-image"
+import React, { useState, useRef, useEffect } from "react"
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated, Platform } from "react-native"
+import Video from 'react-native-video'
+import { WebView } from 'react-native-webview'
 import { FontAwesome5 } from "@expo/vector-icons"
+import * as ScreenOrientation from "expo-screen-orientation"
+import { StatusBar } from "expo-status-bar"
+import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
-import { AggregatedVideo } from "../types/videoag"
+import { MotiView } from "moti"
+import { Easing } from "react-native-reanimated"
 
-interface ModernVideoCardProps {
-  video: AggregatedVideo
-  onPress: () => void
-  style?: object
+interface VideoPlayerProps {
+  videoUrl: string
+  thumbnailUrl?: string
+  title?: string
+  channelName?: string
+  style?: any
+  autoPlay?: boolean
+  showControls?: boolean
+  onProgress?: (progress: number) => void
+  onComplete?: () => void
 }
 
-export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps) {
-  const [isPressed, setIsPressed] = useState(false)
-  const [showOptions, setShowOptions] = useState(false)
-  const [imageLoading, setImageLoading] = useState(true)
-  const [imageError, setImageError] = useState(false)
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ 
+  videoUrl, 
+  thumbnailUrl,
+  title = "Video Title",
+  channelName = "",
+  style, 
+  autoPlay = false,
+  showControls = true,
+  onProgress,
+  onComplete
+}) => {
+  const [isPlaying, setIsPlaying] = useState(autoPlay)
+  const [duration, setDuration] = useState(0)
+  const [position, setPosition] = useState(0)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showControlsOverlay, setShowControlsOverlay] = useState(true)
+  const [isBuffering, setIsBuffering] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [volume, setVolume] = useState(1)
+  const [error, setError] = useState<string | null>(null)
 
-  const getSourceIcon = (source: string) => {
-    switch (source) {
-      case "youtube":
-        return "youtube"
-      case "udemy":
-        return "chalkboard-teacher"
-      case "coursera":
-        return "graduation-cap"
-      case "khan":
-        return "university"
-      case "edx":
-        return "book"
-      case "pluralsight":
-        return "code"
-      case "linkedin":
-        return "linkedin"
-      case "mit":
-        return "flask"
-      case "openlearn":
-        return "open-book"
-      case "futurelearn":
-        return "rocket"
-      case "alison":
-        return "certificate"
-      default:
-        return "play-circle"
-    }
-  }
+  const videoRef = useRef<Video>(null)
+  const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
+  const controlsOpacity = useRef(new Animated.Value(1)).current
+  const { width, height } = Dimensions.get('window')
 
-  const getSourceColor = (source: string) => {
-    switch (source) {
-      case "youtube":
-        return "#FF0000"
-      case "udemy":
-        return "#A435F0"
-      case "coursera":
-        return "#0056D2"
-      case "khan":
-        return "#14BF96"
-      case "edx":
-        return "#02262B"
-      case "pluralsight":
-        return "#F15B2A"
-      case "linkedin":
-        return "#0077B5"
-      case "mit":
-        return "#8A8B8C"
-      case "openlearn":
-        return "#2A73CC"
-      case "futurelearn":
-        return "#DE0A43"
-      case "alison":
-        return "#00A4A4"
-      default:
-        return "#FF6B6B"
-    }
-  }
+  // Check if the URL is a YouTube embed URL
+  const isYouTubeEmbed = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be')
+  console.log('Video URL analysis:', {
+    originalUrl: videoUrl,
+    isYouTubeEmbed,
+    urlType: typeof videoUrl,
+    isEmpty: videoUrl === "",
+    isNullOrUndefined: videoUrl == null
+  })
 
-  const handleLongPress = () => {
-    setShowOptions(true)
-  }
-
-  const formatDate = (dateString: string) => {
+  // Ensure the URL is in the correct embedded format for YouTube
+  const getEmbeddedUrl = (url: string | undefined): string => {
+    if (!url || url.trim() === "") return '';
+    
     try {
-      const date = new Date(dateString)
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      // Extract video ID from various YouTube URL formats
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+      const match = url.match(regExp);
+      
+      if (match && match[2].length === 11) {
+        return `https://www.youtube.com/embed/${match[2]}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1&playsinline=1`
+      }
+      
+      return url;
     } catch (e) {
-      return dateString
+      console.error('Error processing video URL:', e)
+      return url;
     }
+  };
+
+  const embeddedUrl = getEmbeddedUrl(videoUrl)
+  console.log('Final embedded URL:', embeddedUrl)
+
+  const handleLoad = (data: any) => {
+    if (!data || !data.duration) {
+      setError('Failed to load video')
+      return
+    }
+    setDuration(data.duration)
+    setIsBuffering(false)
+  }
+
+  const handleProgress = (data: any) => {
+    setPosition(data.currentTime)
+    if (onProgress) {
+      onProgress(data.currentTime / data.seekableDuration)
+    }
+  }
+
+  const handleEnd = () => {
+    setIsPlaying(false)
+    if (onComplete) {
+      onComplete()
+    }
+  }
+
+  const handleError = (error: any) => {
+    console.error('Video error:', error)
+    setError(`Video error: ${error?.error?.message || 'Failed to play video'}`)
+  }
+
+  const togglePlayPause = () => {
+    setIsPlaying(!isPlaying)
+    showControlsTemporarily()
+  }
+
+  const toggleFullscreen = async () => {
+    if (isFullscreen) {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+    } else {
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+    }
+    setIsFullscreen(!isFullscreen)
+    showControlsTemporarily()
+  }
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted)
+    showControlsTemporarily()
+  }
+
+  const handleSliderValueChange = (value: number) => {
+    if (videoRef.current) {
+      videoRef.current.seek(value * duration)
+    }
+    showControlsTemporarily()
+  }
+
+  const showControlsTemporarily = () => {
+    setShowControlsOverlay(true)
+    Animated.timing(controlsOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start()
+
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current)
+    }
+
+    if (isPlaying) {
+      controlsTimeout.current = setTimeout(() => {
+        Animated.timing(controlsOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowControlsOverlay(false)
+        })
+      }, 3000)
+    }
+  }
+
+  const handleVideoPress = () => {
+    if (showControlsOverlay) {
+      if (isPlaying) {
+        Animated.timing(controlsOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowControlsOverlay(false)
+        })
+      }
+    } else {
+      showControlsTemporarily()
+    }
+  }
+
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
+    const secs = Math.floor(seconds % 60)
+
+    let result = ""
+    if (hrs > 0) {
+      result += `${hrs}:`
+    }
+    result += `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+    return result
+  }
+
+  const isValidUrl = (url: string | undefined): boolean => {
+    if (!url) return false
+    const trimmedUrl = url.trim()
+    return trimmedUrl !== "" && (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://'))
   }
 
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={handleLongPress}
-      onPressIn={() => setIsPressed(true)}
-      onPressOut={() => setIsPressed(false)}
-      style={[styles.container, isPressed && styles.pressed, style]}
-    >
-      <View style={styles.thumbnailContainer}>
-        {imageLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF6B6B" />
+    <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
+      <StatusBar hidden={isFullscreen} />
+      <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={styles.videoWrapper}>
+        {isValidUrl(videoUrl) ? (
+          isYouTubeEmbed ? (
+            <WebView
+              source={{ uri: embeddedUrl }}
+              style={styles.video}
+              allowsFullscreenVideo={true}
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                setError(`WebView error: ${nativeEvent.description}`);
+              }}
+            />
+          ) : (
+            <Video
+              ref={videoRef}
+              source={{ uri: videoUrl }}
+              style={styles.video}
+              resizeMode="contain"
+              paused={!isPlaying}
+              muted={isMuted}
+              volume={volume}
+              onLoad={handleLoad}
+              onProgress={handleProgress}
+              onEnd={handleEnd}
+              onError={handleError}
+              onBuffer={() => setIsBuffering(true)}
+              onLoadStart={() => setIsBuffering(true)}
+              repeat={false}
+              controls={false}
+            />
+          )
+        ) : (
+          <View style={styles.errorContainer}>
+            <BlurView intensity={70} style={styles.errorBlur}>
+              <FontAwesome5 name="exclamation-triangle" size={30} color="#FF6B6B" style={styles.errorIcon} />
+              <Text style={styles.errorText}>
+                {!videoUrl ? "No video source available" : 
+                 videoUrl.trim() === "" ? "Video URL is empty" : 
+                 "Invalid video URL"}
+              </Text>
+            </BlurView>
           </View>
         )}
-        
-        <Image 
-          source={video.thumbnail} 
-          style={[styles.thumbnail, imageLoading && styles.hiddenImage]} 
-          contentFit="cover"
-          onLoadStart={() => setImageLoading(true)}
-          onLoadEnd={() => setImageLoading(false)}
-          onError={() => {
-            setImageError(true)
-            setImageLoading(false)
-          }}
-        />
-        
-        {!imageError && (
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
-            style={styles.gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
-        )}
-        
-        <View style={styles.playButtonContainer}>
-          <View style={styles.playButton}>
-            <FontAwesome5 name="play" size={16} color="#FFF" />
-          </View>
-        </View>
-        
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>{video.duration}</Text>
-        </View>
-        
-        <View style={[styles.sourceBadge, { backgroundColor: getSourceColor(video.source) }]}>
-          <FontAwesome5 name={getSourceIcon(video.source)} size={10} color="#FFF" />
-        </View>
-        
-        {video.isFree && (
-          <View style={styles.freeBadge}>
-            <FontAwesome5 name="gift" size={10} color="#FFF" />
-            <Text style={styles.freeText}>FREE</Text>
-          </View>
-        )}
-      </View>
-      
-      <View style={styles.infoContainer}>
-        <Text style={styles.title} numberOfLines={2}>
-          {video.title}
-        </Text>
-        
-        <View style={styles.metadataRow}>
-          <Text style={styles.channelName}>{video.channelName}</Text>
-          
-          {video.rating && (
-            <View style={styles.ratingContainer}>
-              <FontAwesome5 name="star" size={12} color="#FFD700" />
-              <Text style={styles.ratingText}>{video.rating}</Text>
-            </View>
-          )}
-        </View>
-        
-        {(video.instructor || video.institution) && (
-          <View style={styles.instructorRow}>
-            {video.instructor && (
-              <View style={styles.instructorContainer}>
-                <FontAwesome5 name="user-tie" size={10} color="#666" />
-                <Text style={styles.instructorText} numberOfLines={1}>{video.instructor}</Text>
-              </View>
-            )}
-            
-            {video.institution && (
-              <View style={styles.institutionContainer}>
-                <FontAwesome5 name="university" size={10} color="#666" />
-                <Text style={styles.institutionText} numberOfLines={1}>{video.institution}</Text>
-              </View>
-            )}
-          </View>
-        )}
-        
-        <Text style={styles.metadata}>
-          {video.views} views • {formatDate(video.publishedAt)}
-        </Text>
-        
-        {video.categories && video.categories.length > 0 && (
-          <View style={styles.categoriesContainer}>
-            {video.categories.slice(0, 2).map((category, index) => (
-              <View key={index} style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{category}</Text>
-              </View>
-            ))}
-            {video.categories.length > 2 && (
-              <Text style={styles.moreCategoriesText}>+{video.categories.length - 2}</Text>
-            )}
-          </View>
-        )}
-      </View>
 
-      {showOptions && (
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.optionsOverlay}>
-          <Pressable style={styles.overlayBackground} onPress={() => setShowOptions(false)}>
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="clock" size={16} color="#333" />
-                <Text style={styles.optionText}>Watch Later</Text>
+        {isBuffering && (
+          <MotiView
+            style={styles.bufferingContainer}
+            from={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{
+              type: "timing",
+              duration: 300,
+              easing: Easing.inOut(Easing.ease),
+            }}
+          >
+            <BlurView intensity={50} style={styles.bufferingBlur}>
+              <FontAwesome5 name="spinner" size={24} color="#FFF" style={styles.spinnerIcon} />
+              <Text style={styles.bufferingText}>Loading...</Text>
+            </BlurView>
+          </MotiView>
+        )}
+
+        {error && (
+          <View style={styles.errorContainer}>
+            <BlurView intensity={70} style={styles.errorBlur}>
+              <FontAwesome5 name="exclamation-triangle" size={30} color="#FF6B6B" style={styles.errorIcon} />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={() => setError(null)}
+              >
+                <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="list" size={16} color="#333" />
-                <Text style={styles.optionText}>Add to Playlist</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="download" size={16} color="#333" />
-                <Text style={styles.optionText}>Download</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="share" size={16} color="#333" />
-                <Text style={styles.optionText}>Share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="ban" size={16} color="#333" />
-                <Text style={styles.optionText}>Not Interested</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Animated.View>
-      )}
-    </Pressable>
+            </BlurView>
+          </View>
+        )}
+
+        {showControlsOverlay && !isYouTubeEmbed && (
+          <Animated.View style={[styles.controlsContainer, { opacity: controlsOpacity }]}>
+            <LinearGradient
+              colors={["rgba(0,0,0,0.8)", "transparent"]}
+              style={styles.topGradient}
+            />
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.8)"]}
+              style={styles.bottomGradient}
+            />
+            <BlurView intensity={40} style={styles.controlsBlur}>
+              <View style={styles.topControls}>
+                <TouchableOpacity onPress={() => {}} style={styles.backButton}>
+                  <FontAwesome5 name="arrow-left" size={16} color="#FFF" />
+                </TouchableOpacity>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.videoTitle} numberOfLines={1}>
+                    {title}
+                  </Text>
+                  {channelName && (
+                    <Text style={styles.channelName} numberOfLines={1}>
+                      {channelName}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.topRightControls}>
+                  <TouchableOpacity onPress={toggleMute} style={styles.controlButton}>
+                    <FontAwesome5 name={isMuted ? "volume-mute" : "volume-up"} size={16} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.centerControlsContainer}>
+                <TouchableOpacity onPress={togglePlayPause} style={styles.centerButton}>
+                  <MotiView
+                    animate={{ scale: isPlaying ? 1 : 1.2 }}
+                    transition={{
+                      type: "timing",
+                      duration: 200,
+                      easing: Easing.inOut(Easing.ease),
+                    }}
+                  >
+                    <FontAwesome5
+                      name={isPlaying ? "pause" : "play"}
+                      size={30}
+                      color="#FFF"
+                      style={isPlaying ? {} : { marginLeft: 4 }}
+                    />
+                  </MotiView>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.bottomControls}>
+                <Text style={styles.timeText}>{formatTime(position)}</Text>
+                <TouchableOpacity
+                  style={styles.progressBarContainer}
+                  onPress={(e) => {
+                    const { locationX } = e.nativeEvent;
+                    const newProgress = locationX / width;
+                    handleSliderValueChange(newProgress);
+                  }}
+                >
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progress, { width: `${(position / duration) * 100}%` }]} />
+                  </View>
+                </TouchableOpacity>
+                <Text style={styles.timeText}>{formatTime(duration)}</Text>
+                <TouchableOpacity onPress={toggleFullscreen} style={styles.fullscreenButton}>
+                  <FontAwesome5 name={isFullscreen ? "compress" : "expand"} size={16} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </BlurView>
+          </Animated.View>
+        )}
+      </TouchableOpacity>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "column",
-    marginBottom: 16,
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  pressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  thumbnailContainer: {
-    position: "relative",
-    backgroundColor: "#f0f0f0",
-    overflow: "hidden",
-  },
-  loadingContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-  },
-  thumbnail: {
     width: "100%",
     aspectRatio: 16 / 9,
-  },
-  hiddenImage: {
-    opacity: 0,
-  },
-  gradient: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  playButtonContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 2,
-  },
-  playButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "#000",
+    borderRadius: 12,
+    overflow: "hidden",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
-        shadowRadius: 4,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 5,
+        elevation: 8,
       },
     }),
   },
-  durationBadge: {
-    position: "absolute",
-    bottom: 8,
-    right: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    zIndex: 3,
-  },
-  durationText: {
-    color: "#FFF",
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  sourceBadge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 3,
-  },
-  freeBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#4CAF50",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    zIndex: 3,
-  },
-  freeText: {
-    color: "#FFF",
-    fontSize: 10,
-    fontWeight: "600",
-    marginLeft: 4,
-  },
-  infoContainer: {
-    padding: 12,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
-  },
-  metadataRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 2,
-  },
-  channelName: {
-    fontSize: 14,
-    color: "#666",
-    flex: 1,
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 215, 0, 0.1)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#333",
-    marginLeft: 4,
-  },
-  instructorRow: {
-    flexDirection: "row",
-    marginBottom: 2,
-  },
-  instructorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 12,
-    flex: 1,
-  },
-  instructorText: {
-    fontSize: 12,
-    color: "#666",
-    marginLeft: 4,
-  },
-  institutionContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  institutionText: {
-    fontSize: 12,
-    color: "#666",
-    marginLeft: 4,
-  },
-  metadata: {
-    fontSize: 12,
-    color: "#999",
-    marginBottom: 4,
-  },
-  categoriesContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 4,
-  },
-  categoryBadge: {
-    backgroundColor: "#f0f0f0",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginRight: 6,
-    marginBottom: 4,
-  },
-  categoryText: {
-    fontSize: 10,
-    color: "#666",
-  },
-  moreCategoriesText: {
-    fontSize: 10,
-    color: "#999",
-    alignSelf: "center",
-  },
-  optionsOverlay: {
+  fullscreenContainer: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 10,
+    zIndex: 1000,
+    borderRadius: 0,
   },
-  overlayBackground: {
+  videoWrapper: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
-  optionsContainer: {
-    backgroundColor: "#FFF",
-    borderRadius: 12,
+  video: {
+    width: "100%",
+    height: "100%",
+  },
+  bufferingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bufferingBlur: {
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  spinnerIcon: {
+    marginBottom: 10,
+  },
+  bufferingText: {
+    color: "#FFF",
+    fontSize: 16,
+  },
+  errorContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  errorBlur: {
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
     width: "80%",
+  },
+  errorIcon: {
+    marginBottom: 10,
+  },
+  errorText: {
+    color: "#FFF",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  retryButton: {
+    backgroundColor: "#FF6B6B",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  retryText: {
+    color: "#FFF",
+    fontWeight: "bold",
+  },
+  controlsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
+  },
+  topGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+  },
+  bottomGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+  },
+  controlsBlur: {
+    flex: 1,
     padding: 16,
   },
-  optionButton: {
+  topControls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  backButton: {
+    padding: 8,
+  },
+  titleContainer: {
+    flex: 1,
+    marginHorizontal: 16,
+  },
+  videoTitle: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  channelName: {
+    color: "#DDD",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  topRightControls: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EAEAEA",
   },
-  optionText: {
-    fontSize: 16,
-    color: "#333",
-    marginLeft: 16,
+  controlButton: {
+    padding: 8,
+    marginLeft: 8,
   },
-})
+  centerControlsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    top: "50%",
+    left: 0,
+    right: 0,
+    transform: [{ translateY: -25 }],
+  },
+  centerButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(255, 107, 107, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 30,
+  },
+  bottomControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 8,
+    position: "absolute",
+    bottom: 0,
+    left: 16,
+    right: 16,
+  },
+  timeText: {
+    color: "#FFF",
+    fontSize: 12,
+    width: 50,
+    textAlign: "center",
+  },
+  progressBarContainer: {
+    flex: 1,
+    height: 40,
+    justifyContent: 'center',
+    marginHorizontal: 8,
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 2,
+  },
+  progress: {
+    height: '100%',
+    backgroundColor: '#FF6B6B',
+    borderRadius: 2,
+  },
+  fullscreenButton: {
+    padding: 8,
+  },
+});

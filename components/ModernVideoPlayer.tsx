@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react"
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated, Platform } from "react-native"
-import Video, { VideoRef } from 'react-native-video'
+import { WebView } from 'react-native-webview'
 import { FontAwesome5 } from "@expo/vector-icons"
 import * as ScreenOrientation from "expo-screen-orientation"
 import { StatusBar } from "expo-status-bar"
@@ -54,9 +54,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [volume, setVolume] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
-  const videoRef = useRef<VideoRef>(null)
-  const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
-  const controlsOpacity = useRef(new Animated.Value(1)).current
   const { width, height } = Dimensions.get('window')
 
   // Check if the URL is a YouTube embed URL
@@ -227,22 +224,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       <StatusBar hidden={isFullscreen} />
       <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={styles.videoWrapper}>
         {isValidUrl(videoUrl) ? (
-          <Video
-            ref={videoRef}
-            source={{ uri: videoUrl }}
+          <WebView
+            source={{ uri: embeddedUrl }}
             style={styles.video}
-            resizeMode="contain"
-            paused={!isPlaying}
-            muted={isMuted}
-            volume={volume}
-            onLoad={handleLoad}
-            onProgress={handleProgress}
-            onEnd={handleEnd}
-            onError={handleError}
-            onBuffer={() => setIsBuffering(true)}
-            onLoadStart={() => setIsBuffering(true)}
-            repeat={false}
-            controls={false}
+            allowsFullscreenVideo={true}
+            allowsInlineMediaPlayback={true}
+            mediaPlaybackRequiresUserAction={false}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              setError(`WebView error: ${nativeEvent.description}`);
+            }}
           />
         ) : (
           <View style={styles.errorContainer}>
