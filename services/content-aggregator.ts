@@ -9,7 +9,7 @@ export function extractYouTubeId(url: string): string | null {
 
 // Function to get embedded URL from YouTube video ID
 export function getEmbeddedUrl(videoId: string): string {
-  return `https://www.youtube.com/embed/${videoId}`
+  return `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0`
 }
 
 // Function to get thumbnail URL from YouTube video ID with multiple fallbacks
