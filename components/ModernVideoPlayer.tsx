@@ -176,23 +176,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
       <StatusBar hidden={isFullscreen} />
       <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={styles.videoWrapper}>
-        <Video
-          ref={videoRef}
-          source={{ uri: videoUrl }}
-          style={styles.video}
-          resizeMode="contain"
-          paused={!isPlaying}
-          muted={isMuted}
-          volume={volume}
-          onLoad={handleLoad}
-          onProgress={handleProgress}
-          onEnd={handleEnd}
-          onError={handleError}
-          onBuffer={() => setIsBuffering(true)}
-          onLoadStart={() => setIsBuffering(true)}
-          repeat={false}
-          controls={false}
-        />
+        {videoUrl ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: videoUrl }}
+            style={styles.video}
+            resizeMode="contain"
+            paused={!isPlaying}
+            muted={isMuted}
+            volume={volume}
+            onLoad={handleLoad}
+            onProgress={handleProgress}
+            onEnd={handleEnd}
+            onError={handleError}
+            onBuffer={() => setIsBuffering(true)}
+            onLoadStart={() => setIsBuffering(true)}
+            repeat={false}
+            controls={false}
+          />
+        ) : (
+          <View style={styles.errorContainer}>
+            <BlurView intensity={70} style={styles.errorBlur}>
+              <FontAwesome5 name="exclamation-triangle" size={30} color="#FF6B6B" style={styles.errorIcon} />
+              <Text style={styles.errorText}>No video source available</Text>
+            </BlurView>
+          </View>
+        )}
 
         {isBuffering && (
           <MotiView
