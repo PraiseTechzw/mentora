@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react"
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated, Platform, ViewStyle, TextStyle } from "react-native"
-import { VideoView, useVideoPlayer } from "expo-video"
-import { WebView } from "react-native-webview"
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated, Platform } from "react-native"
+import Video from 'react-native-video'
 import { FontAwesome5 } from "@expo/vector-icons"
 import * as ScreenOrientation from "expo-screen-orientation"
 import { StatusBar } from "expo-status-bar"
@@ -9,33 +8,6 @@ import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
 import { MotiView } from "moti"
 import { Easing } from "react-native-reanimated"
-
-const youtubeHTML = `
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-      body { margin: 0; background: #000; }
-      iframe { width: 100%; height: 100%; }
-    </style>
-  </head>
-  <body>
-    <iframe
-      src="\${videoUrl}"
-      frameborder="0"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowfullscreen
-    ></iframe>
-  </body>
-</html>
-`;
-
-const youtubeIframeScript = `
-  window.addEventListener('message', function(event) {
-    window.ReactNativeWebView.postMessage(event.data);
-  });
-`;
 
 interface VideoPlayerProps {
   videoUrl: string
@@ -60,21 +32,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onProgress,
   onComplete
 }) => {
-  // State variables
-  const [isPlaying, setIsPlaying] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(autoPlay)
   const [duration, setDuration] = useState(0)
   const [position, setPosition] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showControlsOverlay, setShowControlsOverlay] = useState(true)
-  const [isBuffering, setIsBuffering] = useState(true)
+  const [isBuffering, setIsBuffering] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [playbackSpeed, setPlaybackSpeed] = useState(1.0)
-  const [showSpeedOptions, setShowSpeedOptions] = useState(false)
   const [volume, setVolume] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
-  // Refs
-  const videoRef = useRef<WebView>(null)
+  const videoRef = useRef<Video>(null)
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
   const controlsOpacity = useRef(new Animated.Value(1)).current
   const { width, height } = Dimensions.get('window')
@@ -99,205 +67,67 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const embeddedUrl = getEmbeddedUrl(videoUrl);
 
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      if (controlsTimeout.current) {
-        clearTimeout(controlsTimeout.current)
-      }
+  const handleLoad = (data: any) => {
+    setDuration(data.duration)
+    setIsBuffering(false)
+  }
+
+  const handleProgress = (data: any) => {
+    setPosition(data.currentTime)
+    if (onProgress) {
+      onProgress(data.currentTime / data.seekableDuration)
     }
-  }, [])
+  }
 
-  // For direct video playback
-  const player = useVideoPlayer('', () => {
-    // Empty initialization to prevent errors
-  });
-
-  // Only show error if we have no URL at all
-  useEffect(() => {
-    if (!videoUrl) {
-      setError('No video URL provided');
-    } else {
-      setError(null);
+  const handleEnd = () => {
+    setIsPlaying(false)
+    if (onComplete) {
+      onComplete()
     }
-  }, [videoUrl]);
+  }
 
-  // Handle playback status update
-  const handlePlaybackStatusUpdate = (status: any) => {
-    if (!status) {
-      console.log('Received null playback status');
-      return;
-    }
+  const handleError = (error: any) => {
+    console.error('Video error:', error)
+    setError(`Video error: ${error.error?.message || 'Unknown error'}`)
+  }
 
-    console.log('Playback status update:', {
-      isPlaying: status.isPlaying,
-      isBuffering: status.isBuffering,
-      position: status.position,
-      duration: status.duration,
-      error: status.error,
-      didJustFinish: status.didJustFinish
-    });
-
-    setIsPlaying(status.isPlaying);
-    setIsBuffering(status.isBuffering);
-
-    if (status.duration) {
-      console.log('Setting duration:', status.duration);
-      setDuration(status.duration);
-    }
-
-    if (status.position) {
-      console.log('Setting position:', status.position);
-      setPosition(status.position);
-      if (onProgress) {
-        onProgress(status.position / (status.duration || 1));
-      }
-    }
-
-    if (status.error) {
-      console.error('Video error:', status.error);
-      setError(`Video error: ${status.error}`);
-    }
-
-    if (status.didJustFinish && onComplete) {
-      console.log('Video completed');
-      onComplete();
-    }
-  };
-
-  // Toggle play/pause
   const togglePlayPause = () => {
-    console.log('Toggling play/pause. Current state:', { isPlaying });
-    requestAnimationFrame(() => {
-      try {
-        if (isPlaying) {
-          player.pause();
-          console.log('Video paused');
-        } else {
-          player.play();
-          console.log('Video resumed');
-        }
-        setIsPlaying(!isPlaying);
-        showControlsTemporarily();
-      } catch (error) {
-        console.error('Error toggling play/pause:', error);
-      }
-    });
-  };
+    setIsPlaying(!isPlaying)
+    showControlsTemporarily()
+  }
 
-  // Toggle fullscreen
   const toggleFullscreen = async () => {
     if (isFullscreen) {
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
     } else {
-      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
     }
-    setIsFullscreen(!isFullscreen);
-    showControlsTemporarily();
-  };
+    setIsFullscreen(!isFullscreen)
+    showControlsTemporarily()
+  }
 
-  // Toggle mute
   const toggleMute = () => {
-    if (isYouTubeEmbed) {
-      if (videoRef.current) {
-        const message = isMuted
-          ? '{"event":"command","func":"unMute","args":[]}'
-          : '{"event":"command","func":"mute","args":[]}';
-        
-        // @ts-ignore
-        videoRef.current.injectJavaScript(`
-          const player = document.querySelector('iframe').contentWindow;
-          player.postMessage(${message}, '*');
-          true;
-        `);
-      }
-    } else {
-      player.volume = isMuted ? volume : 0;
-    }
-    
-    setIsMuted(!isMuted);
-    showControlsTemporarily();
-  };
+    setIsMuted(!isMuted)
+    showControlsTemporarily()
+  }
 
-  // Set playback rate
-  const setPlaybackRate = (rate: number) => {
-    if (isYouTubeEmbed) {
-      if (videoRef.current) {
-        const message = `{"event":"command","func":"setPlaybackRate","args":[${rate}]}`;
-        
-        // @ts-ignore
-        videoRef.current.injectJavaScript(`
-          const player = document.querySelector('iframe').contentWindow;
-          player.postMessage(${message}, '*');
-          true;
-        `);
-      }
-    } else {
-      player.playbackRate = rate;
-    }
-    
-    setPlaybackSpeed(rate);
-    setShowSpeedOptions(false);
-    showControlsTemporarily();
-  };
-
-  // Handle slider value change
   const handleSliderValueChange = (value: number) => {
-    const newPosition = value * duration;
-    
-    if (isYouTubeEmbed) {
-      if (videoRef.current) {
-        const message = `{"event":"command","func":"seekTo","args":[${newPosition}, true]}`;
-        
-        // @ts-ignore
-        videoRef.current.injectJavaScript(`
-          const player = document.querySelector('iframe').contentWindow;
-          player.postMessage(${message}, '*');
-          true;
-        `);
-      }
-    } else {
-      player.currentTime = newPosition;
+    if (videoRef.current) {
+      videoRef.current.seek(value * duration)
     }
-    
-    setPosition(newPosition);
-    showControlsTemporarily();
-  };
+    showControlsTemporarily()
+  }
 
-  // Skip forward/backward
-  const skipTime = (seconds: number) => {
-    const newPosition = Math.max(0, Math.min(duration, position + seconds));
-    
-    if (isYouTubeEmbed) {
-      if (videoRef.current) {
-        const message = `{"event":"command","func":"seekTo","args":[${newPosition}, true]}`;
-        
-        // @ts-ignore
-        videoRef.current.injectJavaScript(`
-          const player = document.querySelector('iframe').contentWindow;
-          player.postMessage(${message}, '*');
-          true;
-        `);
-      }
-    } else {
-      player.currentTime = newPosition;
-    }
-    
-    setPosition(newPosition);
-    showControlsTemporarily();
-  };
-
-  // Show controls temporarily
   const showControlsTemporarily = () => {
-    setShowControlsOverlay(true);
+    setShowControlsOverlay(true)
     Animated.timing(controlsOpacity, {
       toValue: 1,
       duration: 200,
       useNativeDriver: true,
-    }).start();
+    }).start()
 
     if (controlsTimeout.current) {
-      clearTimeout(controlsTimeout.current);
+      clearTimeout(controlsTimeout.current)
     }
 
     if (isPlaying) {
@@ -307,13 +137,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           duration: 200,
           useNativeDriver: true,
         }).start(() => {
-          setShowControlsOverlay(false);
-        });
-      }, 3000);
+          setShowControlsOverlay(false)
+        })
+      }, 3000)
     }
-  };
+  }
 
-  // Handle video press
   const handleVideoPress = () => {
     if (showControlsOverlay) {
       if (isPlaying) {
@@ -322,82 +151,66 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           duration: 200,
           useNativeDriver: true,
         }).start(() => {
-          setShowControlsOverlay(false);
-        });
+          setShowControlsOverlay(false)
+        })
       }
     } else {
-      showControlsTemporarily();
+      showControlsTemporarily()
     }
-  };
+  }
 
-  // Format time
   const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
+    const hrs = Math.floor(seconds / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
+    const secs = Math.floor(seconds % 60)
 
-    let result = "";
+    let result = ""
     if (hrs > 0) {
-      result += `${hrs}:`;
+      result += `${hrs}:`
     }
-    result += `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-    return result;
-  };
-
-  // Replace the Slider component with a custom progress bar
-  const ProgressBar = ({ progress, onSeek }: { progress: number; onSeek: (value: number) => void }) => {
-    return (
-      <TouchableOpacity
-        style={styles.progressBarContainer}
-        onPress={(e) => {
-          const { locationX } = e.nativeEvent;
-          const newProgress = locationX / Dimensions.get('window').width;
-          onSeek(newProgress);
-        }}
-      >
-        <View style={styles.progressBar}>
-          <View style={[styles.progress, { width: `${progress * 100}%` }]} />
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const handleWebViewMessage = (event: any) => {
-    const data = JSON.parse(event.nativeEvent.data);
-    if (data.event === 'onStateChange') {
-      setIsBuffering(data.info === 'buffering');
-    }
-  };
+    result += `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+    return result
+  }
 
   return (
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
       <StatusBar hidden={isFullscreen} />
       <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={styles.videoWrapper}>
         {isYouTubeEmbed ? (
-          <WebView
+          <Video
             ref={videoRef}
-            source={{ html: youtubeHTML.replace('${videoUrl}', embeddedUrl) }}
+            source={{ uri: videoUrl }}
             style={styles.video}
+            resizeMode="contain"
+            paused={!isPlaying}
+            muted={isMuted}
+            volume={volume}
+            onLoad={handleLoad}
+            onProgress={handleProgress}
+            onEnd={handleEnd}
+            onError={handleError}
+            onBuffer={() => setIsBuffering(true)}
             onLoadStart={() => setIsBuffering(true)}
-            onLoadEnd={() => setIsBuffering(false)}
-            onMessage={handleWebViewMessage}
-            onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              setError(`WebView error: ${nativeEvent.description}`);
-            }}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            mediaPlaybackRequiresUserAction={false}
-            allowsInlineMediaPlayback={true}
-            injectedJavaScript={youtubeIframeScript}
-            startInLoadingState={true}
+            repeat={false}
+            controls={false}
           />
         ) : (
-          <VideoView
-            player={player}
+          <Video
+            ref={videoRef}
+            source={{ uri: videoUrl }}
             style={styles.video}
-            contentFit="contain"
-            nativeControls={false}
+            resizeMode="contain"
+            paused={!isPlaying}
+            muted={isMuted}
+            volume={volume}
+            onLoad={handleLoad}
+            onProgress={handleProgress}
+            onEnd={handleEnd}
+            onError={handleError}
+            onBuffer={() => setIsBuffering(true)}
+            onLoadStart={() => setIsBuffering(true)}
+            repeat={false}
+            controls={false}
           />
         )}
 
@@ -445,15 +258,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               style={styles.bottomGradient}
             />
             <BlurView intensity={40} style={styles.controlsBlur}>
-              {/* Top controls */}
               <View style={styles.topControls}>
                 <TouchableOpacity onPress={() => {}} style={styles.backButton}>
                   <FontAwesome5 name="arrow-left" size={16} color="#FFF" />
                 </TouchableOpacity>
                 <View style={styles.titleContainer}>
-                <Text style={styles.videoTitle} numberOfLines={1}>
-                  {title}
-                </Text>
+                  <Text style={styles.videoTitle} numberOfLines={1}>
+                    {title}
+                  </Text>
                   {channelName && (
                     <Text style={styles.channelName} numberOfLines={1}>
                       {channelName}
@@ -464,55 +276,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   <TouchableOpacity onPress={toggleMute} style={styles.controlButton}>
                     <FontAwesome5 name={isMuted ? "volume-mute" : "volume-up"} size={16} color="#FFF" />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setShowSpeedOptions(!showSpeedOptions)} style={styles.controlButton}>
-                    <Text style={styles.speedText}>{playbackSpeed}x</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
 
-              {/* Speed options */}
-              {showSpeedOptions && (
-                <MotiView
-                  style={styles.speedOptionsContainer}
-                  from={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{
-                    type: "timing",
-                    duration: 200,
-                    easing: Easing.inOut(Easing.ease),
-                  }}
-                >
-                  {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((speed) => (
-                    <TouchableOpacity
-                      key={speed}
-                      style={[styles.speedOption, playbackSpeed === speed && styles.activeSpeedOption]}
-                      onPress={() => setPlaybackRate(speed)}
-                    >
-                      <Text style={[styles.speedOptionText, playbackSpeed === speed && styles.activeSpeedOptionText]}>
-                        {speed}x
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </MotiView>
-              )}
-
-              {/* Center controls */}
               <View style={styles.centerControlsContainer}>
-                <TouchableOpacity onPress={() => skipTime(-10)} style={styles.skipButton}>
-                  <MotiView
-                    animate={{ scale: 1 }}
-                    transition={{
-                      type: "timing",
-                      duration: 100,
-                      easing: Easing.inOut(Easing.ease),
-                    }}
-                  >
-                    <FontAwesome5 name="backward" size={20} color="#FFF" />
-                    <Text style={styles.skipText}>10s</Text>
-                  </MotiView>
-                </TouchableOpacity>
-
-              <TouchableOpacity onPress={togglePlayPause} style={styles.centerButton}>
+                <TouchableOpacity onPress={togglePlayPause} style={styles.centerButton}>
                   <MotiView
                     animate={{ scale: isPlaying ? 1 : 1.2 }}
                     transition={{
@@ -521,37 +289,30 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                       easing: Easing.inOut(Easing.ease),
                     }}
                   >
-                <FontAwesome5
-                  name={isPlaying ? "pause" : "play"}
-                  size={30}
-                  color="#FFF"
-                  style={isPlaying ? {} : { marginLeft: 4 }}
-                />
-                  </MotiView>
-              </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => skipTime(10)} style={styles.skipButton}>
-                  <MotiView
-                    animate={{ scale: 1 }}
-                    transition={{
-                      type: "timing",
-                      duration: 100,
-                      easing: Easing.inOut(Easing.ease),
-                    }}
-                  >
-                    <FontAwesome5 name="forward" size={20} color="#FFF" />
-                    <Text style={styles.skipText}>10s</Text>
+                    <FontAwesome5
+                      name={isPlaying ? "pause" : "play"}
+                      size={30}
+                      color="#FFF"
+                      style={isPlaying ? {} : { marginLeft: 4 }}
+                    />
                   </MotiView>
                 </TouchableOpacity>
               </View>
 
-              {/* Bottom controls */}
               <View style={styles.bottomControls}>
                 <Text style={styles.timeText}>{formatTime(position)}</Text>
-                <ProgressBar
-                  progress={duration > 0 ? position / duration : 0}
-                  onSeek={handleSliderValueChange}
-                />
+                <TouchableOpacity
+                  style={styles.progressBarContainer}
+                  onPress={(e) => {
+                    const { locationX } = e.nativeEvent;
+                    const newProgress = locationX / width;
+                    handleSliderValueChange(newProgress);
+                  }}
+                >
+                  <View style={styles.progressBar}>
+                    <View style={[styles.progress, { width: `${(position / duration) * 100}%` }]} />
+                  </View>
+                </TouchableOpacity>
                 <Text style={styles.timeText}>{formatTime(duration)}</Text>
                 <TouchableOpacity onPress={toggleFullscreen} style={styles.fullscreenButton}>
                   <FontAwesome5 name={isFullscreen ? "compress" : "expand"} size={16} color="#FFF" />
@@ -562,8 +323,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         )}
       </TouchableOpacity>
     </View>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -702,33 +463,6 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
-  speedText: {
-    color: "#FFF",
-    fontSize: 14,
-  },
-  speedOptionsContainer: {
-    position: "absolute",
-    top: 50,
-    right: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-    borderRadius: 8,
-    padding: 8,
-    zIndex: 10,
-  },
-  speedOption: {
-    padding: 8,
-  },
-  activeSpeedOption: {
-    backgroundColor: "rgba(255, 107, 107, 0.3)",
-    borderRadius: 4,
-  },
-  speedOptionText: {
-    color: "#FFF",
-    fontSize: 14,
-  },
-  activeSpeedOptionText: {
-    color: "#FF6B6B",
-  },
   centerControlsContainer: {
     flexDirection: "row",
     justifyContent: "center",
@@ -747,20 +481,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginHorizontal: 30,
-  },
-  skipButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  skipText: {
-    color: "#FFF",
-    fontSize: 10,
-    textAlign: "center",
-    marginTop: 2,
   },
   bottomControls: {
     flexDirection: "row",
