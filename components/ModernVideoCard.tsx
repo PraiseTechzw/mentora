@@ -24,12 +24,10 @@ interface VideoPlayerProps {
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ 
   videoUrl, 
-  thumbnailUrl,
   title = "Video Title",
   channelName = "",
   style, 
   autoPlay = false,
-  showControls = true,
   onProgress,
   onComplete
 }) => {
@@ -43,10 +41,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [volume, setVolume] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
-  const videoRef = useRef<Video>(null)
+  const videoRef = useRef<typeof Video>(null)
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
   const controlsOpacity = useRef(new Animated.Value(1)).current
-  const { width, height } = Dimensions.get('window')
+  const { width } = Dimensions.get('window')
 
   // Check if the URL is a YouTube embed URL
   const isYouTubeEmbed = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be')
