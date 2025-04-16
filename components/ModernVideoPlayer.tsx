@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Animated, Platform } from "react-native"
-import Video from 'react-native-video'
+import Video, { VideoRef } from 'react-native-video'
 import { FontAwesome5 } from "@expo/vector-icons"
 import * as ScreenOrientation from "expo-screen-orientation"
 import { StatusBar } from "expo-status-bar"
@@ -42,7 +42,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [volume, setVolume] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
-  const videoRef = useRef<typeof Video>(null)
+  const videoRef = useRef<VideoRef>(null)
   const controlsTimeout = useRef<NodeJS.Timeout | null>(null)
   const controlsOpacity = useRef(new Animated.Value(1)).current
   const { width, height } = Dimensions.get('window')
@@ -176,43 +176,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
       <StatusBar hidden={isFullscreen} />
       <TouchableOpacity activeOpacity={1} onPress={handleVideoPress} style={styles.videoWrapper}>
-        {isYouTubeEmbed ? (
-          <Video
-            ref={videoRef}
-            source={{ uri: videoUrl }}
-            style={styles.video}
-            resizeMode="contain"
-            paused={!isPlaying}
-            muted={isMuted}
-            volume={volume}
-            onLoad={handleLoad}
-            onProgress={handleProgress}
-            onEnd={handleEnd}
-            onError={handleError}
-            onBuffer={() => setIsBuffering(true)}
-            onLoadStart={() => setIsBuffering(true)}
-            repeat={false}
-            controls={false}
-          />
-        ) : (
-          <Video
-            ref={videoRef}
-            source={{ uri: videoUrl }}
-            style={styles.video}
-            resizeMode="contain"
-            paused={!isPlaying}
-            muted={isMuted}
-            volume={volume}
-            onLoad={handleLoad}
-            onProgress={handleProgress}
-            onEnd={handleEnd}
-            onError={handleError}
-            onBuffer={() => setIsBuffering(true)}
-            onLoadStart={() => setIsBuffering(true)}
-            repeat={false}
-            controls={false}
-          />
-        )}
+        <Video
+          ref={videoRef}
+          source={{ uri: videoUrl }}
+          style={styles.video}
+          resizeMode="contain"
+          paused={!isPlaying}
+          muted={isMuted}
+          volume={volume}
+          onLoad={handleLoad}
+          onProgress={handleProgress}
+          onEnd={handleEnd}
+          onError={handleError}
+          onBuffer={() => setIsBuffering(true)}
+          onLoadStart={() => setIsBuffering(true)}
+          repeat={false}
+          controls={false}
+        />
 
         {isBuffering && (
           <MotiView
