@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Dimensions, Platform } from "react-native"
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Dimensions, Platform, ActivityIndicator } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { Image } from "expo-image"
@@ -127,13 +127,25 @@ export default function VideoScreen() {
       <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false}>
         {/* Video Player */}
         <View style={styles.videoContainer}>
-          <VideoPlayer
-            videoUrl={video?.videoUrl || ""}
-            thumbnailUrl={video?.thumbnail || ""}
-            title={video?.title || "Loading..."}
-            onProgress={handleVideoProgress}
-            onComplete={handleVideoComplete}
-          />
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF6B6B" />
+              <Text style={styles.loadingText}>Loading video...</Text>
+            </View>
+          ) : video?.videoUrl ? (
+            <VideoPlayer
+              videoUrl={video.videoUrl}
+              thumbnailUrl={video.thumbnail}
+              title={video.title}
+              onProgress={handleVideoProgress}
+              onComplete={handleVideoComplete}
+            />
+          ) : (
+            <View style={styles.errorContainer}>
+              <FontAwesome5 name="exclamation-triangle" size={30} color="#FF6B6B" />
+              <Text style={styles.errorText}>Video not available</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.contentContainer}>
@@ -518,5 +530,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     overflow: "hidden",
     backgroundColor: "rgba(0, 0, 0, 0.3)",
+  },
+  loadingContainer: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+    borderRadius: 12,
+  },
+  loadingText: {
+    color: "#FFF",
+    marginTop: 12,
+    fontSize: 16,
+  },
+  errorContainer: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+    borderRadius: 12,
+  },
+  errorText: {
+    color: "#FFF",
+    marginTop: 12,
+    fontSize: 16,
   },
 })
