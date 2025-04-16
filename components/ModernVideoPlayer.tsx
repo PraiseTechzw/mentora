@@ -109,30 +109,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [])
 
   // For direct video playback
-  const player = useVideoPlayer('', (player) => {
-    // Only initialize for non-YouTube videos with a valid URL
-    if (!isYouTubeEmbed && videoUrl) {
-      player.loop = false;
-      player.volume = 1;
-      
-      requestAnimationFrame(() => {
-        try {
-          player.play();
-        } catch (error) {
-          console.error('Error starting video:', error);
-        }
-      });
-    }
+  const player = useVideoPlayer('', () => {
+    // Empty initialization to prevent errors
   });
 
-  // Show error only if we have no URL and it's not a YouTube video
+  // Only show error if we have no URL at all
   useEffect(() => {
-    if (!videoUrl && !isYouTubeEmbed) {
+    if (!videoUrl) {
       setError('No video URL provided');
     } else {
       setError(null);
     }
-  }, [videoUrl, isYouTubeEmbed]);
+  }, [videoUrl]);
 
   // Handle playback status update
   const handlePlaybackStatusUpdate = (status: any) => {
@@ -390,18 +378,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             ref={videoRef}
             source={{ html: youtubeHTML.replace('${videoUrl}', embeddedUrl) }}
             style={styles.video}
-            onLoadStart={() => {
-              console.log('WebView loading started');
-              setIsBuffering(true);
-            }}
-            onLoadEnd={() => {
-              console.log('WebView loading completed');
-              setIsBuffering(false);
-            }}
+            onLoadStart={() => setIsBuffering(true)}
+            onLoadEnd={() => setIsBuffering(false)}
             onMessage={handleWebViewMessage}
             onError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
-              console.error('WebView error:', nativeEvent);
               setError(`WebView error: ${nativeEvent.description}`);
             }}
             javaScriptEnabled={true}
