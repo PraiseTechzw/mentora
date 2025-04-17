@@ -115,10 +115,10 @@ export default function ExploreScreen() {
         
         // Apply filters
         if (activeFilters.includes('free')) {
-          filteredContent = filteredContent.filter(video => !video.isPremium);
+          filteredContent = filteredContent.filter(video => video.isFree);
         }
         if (activeFilters.includes('premium')) {
-          filteredContent = filteredContent.filter(video => video.isPremium);
+          filteredContent = filteredContent.filter(video => !video.isFree);
         }
         if (activeFilters.includes('short')) {
           filteredContent = filteredContent.filter(video => {
@@ -148,10 +148,18 @@ export default function ExploreScreen() {
             filteredContent.sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
             break;
           case 'popular':
-            filteredContent.sort((a, b) => (b.views || 0) - (a.views || 0));
+            filteredContent.sort((a, b) => {
+              const viewsA = parseInt(a.views.replace(/[^0-9]/g, '')) || 0;
+              const viewsB = parseInt(b.views.replace(/[^0-9]/g, '')) || 0;
+              return viewsB - viewsA;
+            });
             break;
           case 'rating':
-            filteredContent.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+            filteredContent.sort((a, b) => {
+              const ratingA = parseFloat(a.rating || '0');
+              const ratingB = parseFloat(b.rating || '0');
+              return ratingB - ratingA;
+            });
             break;
           case 'duration':
             filteredContent.sort((a, b) => {
@@ -230,10 +238,10 @@ export default function ExploreScreen() {
       
       // Apply filters
       if (activeFilters.includes('free')) {
-        filteredContent = filteredContent.filter(video => !video.isPremium);
+        filteredContent = filteredContent.filter(video => video.isFree);
       }
       if (activeFilters.includes('premium')) {
-        filteredContent = filteredContent.filter(video => video.isPremium);
+        filteredContent = filteredContent.filter(video => !video.isFree);
       }
       if (activeFilters.includes('short')) {
         filteredContent = filteredContent.filter(video => {
@@ -263,10 +271,18 @@ export default function ExploreScreen() {
           filteredContent.sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
           break;
         case 'popular':
-          filteredContent.sort((a, b) => (b.views || 0) - (a.views || 0));
+          filteredContent.sort((a, b) => {
+            const viewsA = parseInt(a.views.replace(/[^0-9]/g, '')) || 0;
+            const viewsB = parseInt(b.views.replace(/[^0-9]/g, '')) || 0;
+            return viewsB - viewsA;
+          });
           break;
         case 'rating':
-          filteredContent.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+          filteredContent.sort((a, b) => {
+            const ratingA = parseFloat(a.rating || '0');
+            const ratingB = parseFloat(b.rating || '0');
+            return ratingB - ratingA;
+          });
           break;
         case 'duration':
           filteredContent.sort((a, b) => {
@@ -564,48 +580,46 @@ export default function ExploreScreen() {
 
           {/* Search and filter */}
           <View style={styles.searchContainer}>
-            <View style={styles.searchInputContainer}>
-              <FontAwesome5 name="search" size={18} color="#666" style={{ marginRight: 8 }} />
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search for topics, courses, or instructors"
                 placeholderTextColor="#666"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-                autoCorrect={false}
+        value={searchQuery}
+        onChangeText={setSearchQuery}
               />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery("")}>
-                  <FontAwesome5 name="times-circle" size={18} color="#666" />
+              <View style={styles.searchIconContainer}>
+                <TouchableOpacity 
+                  style={styles.searchIcon}
+                  onPress={() => setShowFilters(true)}
+                >
+                  <FontAwesome5 name="search" size={20} color="#FFF" />
                 </TouchableOpacity>
-              )}
-            </View>
-            <View style={[styles.searchIconContainer, { marginTop: 12 }]}>
-              <TouchableOpacity 
-                style={styles.filterIcon}
-                onPress={() => setShowFilters(true)}
-              >
-                <FontAwesome5 name="filter" size={18} color="#666" />
-                {activeFilters.length > 0 && (
-                  <View style={{
-                    position: "absolute",
-                    top: -4,
-                    right: -4,
-                    backgroundColor: "#FF6B6B",
-                    borderRadius: 10,
-                    minWidth: 20,
-                    height: 20,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    paddingHorizontal: 4,
-                  }}>
-                    <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "600" }}>
-                      {activeFilters.length}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.filterIcon}
+                  onPress={() => setShowFilters(true)}
+                >
+                  <FontAwesome5 name="filter" size={18} color="#666" />
+                  {activeFilters.length > 0 && (
+                    <View style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      backgroundColor: "#FF6B6B",
+                      borderRadius: 10,
+                      minWidth: 20,
+                      height: 20,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      paddingHorizontal: 4,
+                    }}>
+                      <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "600" }}>
+                        {activeFilters.length}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
             {activeFilters.length > 0 && (
               <ScrollView
@@ -672,9 +686,9 @@ export default function ExploreScreen() {
                         (index + 1) * CARD_WIDTH,
                       ]
 
-                      const dotWidth = scrollX.interpolate({
+                      const scale = scrollX.interpolate({
                         inputRange,
-                        outputRange: [8, 16, 8],
+                        outputRange: [0.8, 1, 0.8],
                         extrapolate: "clamp",
                       })
 
@@ -689,7 +703,10 @@ export default function ExploreScreen() {
                           key={index}
                           style={[
                             styles.paginationDot,
-                            { width: dotWidth, opacity },
+                            {
+                              transform: [{ scale }],
+                              opacity,
+                            },
                           ]}
                         />
                       )
@@ -861,20 +878,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  searchInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 48,
-  },
   searchInput: {
     flex: 1,
     height: 48,
     fontSize: 16,
     color: "#333",
     paddingHorizontal: 12,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 12,
+    marginRight: 8,
   },
   searchIconContainer: {
     flexDirection: "row",
