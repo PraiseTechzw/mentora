@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { 
   StyleSheet, 
   View, 
@@ -11,7 +11,8 @@ import {
   RefreshControl,
   Dimensions,
   Animated,
-  Platform
+  Platform,
+  ActivityIndicator
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
@@ -22,10 +23,15 @@ import { useRouter } from "expo-router"
 
 import { SearchBar } from "../../components/SearchBar"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
-import { AggregatedVideo } from "../../services/content-aggregator"
-import { getAggregatedContent, getTrendingContent } from "../../services/content-aggregator"
+import { 
+  getAggregatedContent, 
+  getTrendingContent, 
+  getRecommendedContent,
+  discoverEducationalChannels
+} from "../../services/content-aggregator"
+import { AggregatedVideo } from "../../types/videoag"
 
-// Mock user data
+// User data (could be fetched from a user service in a real app)
 const USER = {
   name: "Alex",
   avatar: "https://randomuser.me/api/portraits/men/32.jpg",
@@ -33,221 +39,16 @@ const USER = {
   points: 1250,
 }
 
-// Mock categories with icons and course counts
+// Categories with icons and colors
 const CATEGORIES = [
-  { id: "1", name: "Programming", icon: "laptop-code", count: 245, color: "#4361EE" },
-  { id: "2", name: "Mathematics", icon: "square-root-alt", count: 189, color: "#3A0CA3" },
-  { id: "3", name: "Science", icon: "flask", count: 312, color: "#7209B7" },
-  { id: "4", name: "History", icon: "landmark", count: 156, color: "#F72585" },
-  { id: "5", name: "Languages", icon: "language", count: 201, color: "#4CC9F0" },
-  { id: "6", name: "Arts", icon: "paint-brush", count: 124, color: "#F77F00" },
-  { id: "7", name: "Business", icon: "chart-line", count: 178, color: "#4D908E" },
-  { id: "8", name: "Health", icon: "heartbeat", count: 143, color: "#F94144" },
-]
-
-// Mock trending courses
-const TRENDING_COURSES = [
-  {
-    id: "1",
-    title: "Machine Learning Fundamentals",
-    instructor: "Dr. Andrew Smith",
-    thumbnail: "https://i.ytimg.com/vi/NWONeJKn6kc/maxresdefault.jpg",
-    rating: 4.8,
-    students: 12453,
-  },
-  {
-    id: "2",
-    title: "Complete Web Development Bootcamp",
-    instructor: "Jessica Chen",
-    thumbnail: "https://i.ytimg.com/vi/PkZNo7MFNFg/maxresdefault.jpg",
-    rating: 4.9,
-    students: 28941,
-  },
-  {
-    id: "3",
-    title: "Financial Literacy: Master Your Money",
-    instructor: "Robert Kiyosaki",
-    thumbnail: "https://i.ytimg.com/vi/KCzIfiLZK7w/maxresdefault.jpg",
-    rating: 4.7,
-    students: 9872,
-  },
-]
-
-// Mock featured content
-const FEATURED_CONTENT = [
-  {
-    id: "f1",
-    title: "The Future of AI",
-    subtitle: "Explore the latest developments in artificial intelligence",
-    thumbnail: "https://i.ytimg.com/vi/NWONeJKn6kc/maxresdefault.jpg",
-    category: "Programming",
-    duration: "12:45",
-    source: "youtube",
-  },
-  {
-    id: "f2",
-    title: "Quantum Computing Explained",
-    subtitle: "Understanding the principles of quantum computing",
-    thumbnail: "https://i.ytimg.com/vi/PkZNo7MFNFg/maxresdefault.jpg",
-    category: "Science",
-    duration: "18:30",
-    source: "coursera",
-  },
-  {
-    id: "f3",
-    title: "Financial Markets 2023",
-    subtitle: "Analysis of current financial market trends",
-    thumbnail: "https://i.ytimg.com/vi/KCzIfiLZK7w/maxresdefault.jpg",
-    category: "Business",
-    duration: "15:20",
-    source: "udemy",
-  },
-]
-
-// Mock recently viewed
-const RECENTLY_VIEWED = [
-  {
-    id: "rv1",
-    title: "Introduction to React Native",
-    thumbnail: "https://i.ytimg.com/vi/NWONeJKn6kc/maxresdefault.jpg",
-    progress: 0.65,
-    duration: "45:30",
-    source: "youtube",
-  },
-  {
-    id: "rv2",
-    title: "Advanced JavaScript Concepts",
-    thumbnail: "https://i.ytimg.com/vi/PkZNo7MFNFg/maxresdefault.jpg",
-    progress: 0.30,
-    duration: "32:15",
-    source: "udemy",
-  },
-]
-
-// Mock popular instructors
-const POPULAR_INSTRUCTORS = [
-  {
-    id: "i1",
-    name: "Dr. Sarah Johnson",
-    specialty: "Data Science",
-    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-    followers: 125000,
-  },
-  {
-    id: "i2",
-    name: "Michael Chen",
-    specialty: "Web Development",
-    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-    followers: 98000,
-  },
-  {
-    id: "i3",
-    name: "Emily Rodriguez",
-    specialty: "UX Design",
-    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
-    followers: 75000,
-  },
-]
-
-// Mock learning paths
-const LEARNING_PATHS = [
-  {
-    id: "lp1",
-    title: "Full-Stack Developer",
-    description: "Master front-end and back-end development",
-    icon: "code",
-    duration: "6 months",
-    level: "Intermediate",
-    courses: 12,
-  },
-  {
-    id: "lp2",
-    title: "Data Scientist",
-    description: "Learn data analysis and machine learning",
-    icon: "chart-bar",
-    duration: "8 months",
-    level: "Advanced",
-    courses: 15,
-  },
-  {
-    id: "lp3",
-    title: "Digital Marketing",
-    description: "Master online marketing strategies",
-    icon: "bullhorn",
-    duration: "4 months",
-    level: "Beginner",
-    courses: 8,
-  },
-]
-
-// Mock aggregated videos for ModernVideoCard
-const AGGREGATED_VIDEOS: AggregatedVideo[] = [
-  {
-    id: "v1",
-    title: "Complete React Native Tutorial",
-    description: "Learn React Native from scratch",
-    thumbnail: "https://i.ytimg.com/vi/0kYk9Jh7ZtY/maxresdefault.jpg",
-    channelTitle: "Traversy Media",
-    publishedAt: "2024-03-15T10:00:00Z",
-    viewCount: "150K",
-    duration: "2:30:00",
-    source: "youtube" as const,
-    sourceUrl: "https://youtube.com/watch?v=0kYk9Jh7ZtY",
-    videoUrl: "https://youtube.com/watch?v=0kYk9Jh7ZtY",
-    rating: "4.8",
-  },
-  {
-    id: "v2",
-    title: "Advanced JavaScript Concepts",
-    description: "Deep dive into JavaScript advanced features",
-    thumbnail: "https://i.ytimg.com/vi/PkZNo7MFNFg/maxresdefault.jpg",
-    channelTitle: "JavaScript Academy",
-    publishedAt: "2023-06-20T14:15:00Z",
-    viewCount: "98,000",
-    duration: "18:30",
-    source: "udemy",
-    sourceUrl: "https://udemy.com/course/example2",
-    videoUrl: "https://udemy.com/course/example2",
-    rating: "4.7",
-  },
-]
-
-// Mock popular channels and sources
-const POPULAR_CHANNELS = [
-  {
-    id: "c1",
-    name: "Traversy Media",
-    type: "youtube",
-    subscribers: "1.8M",
-    description: "Web development tutorials and courses",
-    avatar: "https://yt3.googleusercontent.com/ytc/APkrFKZWeMCsx4rzNfxYYwZlnZUFr4DZt1h9JQJ8H6B4=s176-c-k-c0x00ffffff-no-rj",
-    featured: true,
-  },
-  {
-    id: "c2",
-    name: "freeCodeCamp",
-    type: "youtube",
-    subscribers: "7.2M",
-    description: "Learn to code for free",
-    avatar: "https://yt3.googleusercontent.com/ytc/APkrFKa_8ZIz9JXQps8PpMkqNk3hOKJHKXJbJZQJ8JZQ=s176-c-k-c0x00ffffff-no-rj",
-    featured: true,
-  },
-  {
-    id: "c3",
-    name: "Coursera",
-    type: "platform",
-    description: "Online learning platform with university courses",
-    logo: "https://d3njjcbhbojbot.cloudfront.net/api/utilities/v1/imageproxy/https://coursera.s3.amazonaws.com/media/coursera-logo-square.png",
-    featured: true,
-  },
-  {
-    id: "c4",
-    name: "Udemy",
-    type: "platform",
-    description: "Learn anything, anywhere",
-    logo: "https://www.udemy.com/staticx/udemy/images/v7/logo-udemy.svg",
-    featured: true,
-  },
+  { id: "1", name: "Programming", icon: "laptop-code", color: "#4361EE" },
+  { id: "2", name: "Mathematics", icon: "square-root-alt", color: "#3A0CA3" },
+  { id: "3", name: "Science", icon: "flask", color: "#7209B7" },
+  { id: "4", name: "History", icon: "landmark", color: "#F72585" },
+  { id: "5", name: "Languages", icon: "language", color: "#4CC9F0" },
+  { id: "6", name: "Arts", icon: "paint-brush", color: "#F77F00" },
+  { id: "7", name: "Business", icon: "chart-line", color: "#4D908E" },
+  { id: "8", name: "Health", icon: "heartbeat", color: "#F94144" },
 ]
 
 const { width } = Dimensions.get("window")
@@ -260,31 +61,137 @@ export default function ExploreScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [activeCategory, setActiveCategory] = useState("all")
   const scrollX = useRef(new Animated.Value(0)).current
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [videos, setVideos] = useState<AggregatedVideo[]>([])
+  const [featuredContent, setFeaturedContent] = useState<AggregatedVideo[]>([])
+  const [trendingCourses, setTrendingCourses] = useState<AggregatedVideo[]>([])
+  const [recentlyViewed, setRecentlyViewed] = useState<AggregatedVideo[]>([])
+  const [popularInstructors, setPopularInstructors] = useState<any[]>([])
+  const [learningPaths, setLearningPaths] = useState<any[]>([])
+  const [popularChannels, setPopularChannels] = useState<any[]>([])
 
-  // Load content when component mounts or when search/category changes
+  // Load all content when component mounts or when search/category changes
   useEffect(() => {
-    const loadContent = async () => {
+    const loadAllContent = async () => {
       setIsLoading(true)
       try {
-        const content = await getAggregatedContent(searchQuery, activeCategory)
-        setVideos(content)
+        // Load main videos based on search/category
+        const mainContent = await getAggregatedContent(searchQuery, activeCategory)
+        setVideos(mainContent)
+        
+        // Load featured content (trending educational videos)
+        const featured = await getTrendingContent(true)
+        setFeaturedContent(featured.slice(0, 5))
+        
+        // Load trending courses
+        const trending = await getTrendingContent(true)
+        setTrendingCourses(trending.slice(0, 3))
+        
+        // Load recently viewed (in a real app, this would come from local storage)
+        // For now, we'll use recommended content as a placeholder
+        const recent = await getRecommendedContent(["programming", "web development"], true)
+        setRecentlyViewed(recent.slice(0, 5))
+        
+        // Load popular instructors (in a real app, this would come from an API)
+        // For now, we'll use a simplified version of the mock data
+        setPopularInstructors([
+          {
+            id: "i1",
+            name: "Dr. Sarah Johnson",
+            specialty: "Data Science",
+            avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+            followers: 125000,
+            source: "embedded" as const,
+          },
+          {
+            id: "i2",
+            name: "Michael Chen",
+            specialty: "Web Development",
+            avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+            followers: 98000,
+            source: "embedded" as const,
+          },
+          {
+            id: "i3",
+            name: "Emily Rodriguez",
+            specialty: "UX Design",
+            avatar: "https://randomuser.me/api/portraits/women/68.jpg",
+            followers: 75000,
+            source: "embedded" as const,
+          },
+        ])
+        
+        // Load learning paths (in a real app, this would come from an API)
+        // For now, we'll use a simplified version of the mock data
+        setLearningPaths([
+          {
+            id: "lp1",
+            title: "Full-Stack Developer",
+            description: "Master front-end and back-end development",
+            icon: "code",
+            duration: "6 months",
+            level: "Intermediate",
+            courses: 12,
+          },
+          {
+            id: "lp2",
+            title: "Data Scientist",
+            description: "Learn data analysis and machine learning",
+            icon: "chart-bar",
+            duration: "8 months",
+            level: "Advanced",
+            courses: 15,
+          },
+          {
+            id: "lp3",
+            title: "Digital Marketing",
+            description: "Master online marketing strategies",
+            icon: "bullhorn",
+            duration: "4 months",
+            level: "Beginner",
+            courses: 8,
+          },
+        ])
+        
+        // Load popular channels
+        const channels = await discoverEducationalChannels()
+        setPopularChannels(channels.map(channel => ({
+          ...channel,
+          type: 'youtube',
+          featured: true
+        })))
       } catch (error) {
         console.error("Error loading content:", error)
-        setVideos([])
       } finally {
         setIsLoading(false)
       }
     }
-    loadContent()
+    
+    loadAllContent()
   }, [searchQuery, activeCategory])
 
   const onRefresh = async () => {
     setRefreshing(true)
     try {
-      const content = await getTrendingContent()
-      setVideos(content)
+      // Refresh all content
+      const mainContent = await getAggregatedContent(searchQuery, activeCategory)
+      setVideos(mainContent)
+      
+      const featured = await getTrendingContent(true)
+      setFeaturedContent(featured.slice(0, 5))
+      
+      const trending = await getTrendingContent(true)
+      setTrendingCourses(trending.slice(0, 3))
+      
+      const recent = await getRecommendedContent(["programming", "web development"], true)
+      setRecentlyViewed(recent.slice(0, 5))
+      
+      const channels = await discoverEducationalChannels()
+      setPopularChannels(channels.map(channel => ({
+        ...channel,
+        type: 'youtube',
+        featured: true
+      })))
     } catch (error) {
       console.error("Error refreshing content:", error)
     } finally {
@@ -317,7 +224,7 @@ export default function ExploreScreen() {
         <FontAwesome5 name={item.icon} size={24} color="#FFF" />
       </View>
       <Text style={styles.categoryName}>{item.name}</Text>
-      <Text style={styles.categoryCount}>{item.count} courses</Text>
+      <Text style={styles.categoryCount}>{videos.filter(v => v.title.toLowerCase().includes(item.name.toLowerCase())).length} courses</Text>
     </TouchableOpacity>
   )
 
@@ -357,10 +264,10 @@ export default function ExploreScreen() {
         >
           <View style={styles.featuredContent}>
             <View style={styles.featuredCategory}>
-              <Text style={styles.featuredCategoryText}>{item.category}</Text>
+              <Text style={styles.featuredCategoryText}>{item.source}</Text>
             </View>
             <Text style={styles.featuredTitle}>{item.title}</Text>
-            <Text style={styles.featuredSubtitle}>{item.subtitle}</Text>
+            <Text style={styles.featuredSubtitle}>{item.description}</Text>
             <View style={styles.featuredMeta}>
               <View style={styles.featuredMetaItem}>
                 <FontAwesome5 name="clock" size={12} color="#FFF" />
@@ -378,17 +285,20 @@ export default function ExploreScreen() {
   }
 
   const renderTrendingCourse = ({ item }) => (
-    <TouchableOpacity style={styles.trendingCourse}>
+    <TouchableOpacity 
+      style={styles.trendingCourse}
+      onPress={() => router.push(`/video/${item.id}`)}
+    >
       <Image source={item.thumbnail} style={styles.courseThumbnail} contentFit="cover" />
       <View style={styles.courseInfo}>
         <Text style={styles.courseTitle} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={styles.instructorName}>{item.instructor}</Text>
+        <Text style={styles.instructorName}>{item.channelName}</Text>
         <View style={styles.ratingContainer}>
           <FontAwesome5 name="star" solid size={14} color="#FFD700" />
           <Text style={styles.ratingText}>
-            {item.rating} ({item.students.toLocaleString()} students)
+            {item.rating || "4.5"} ({item.views} views)
           </Text>
         </View>
       </View>
@@ -396,11 +306,14 @@ export default function ExploreScreen() {
   )
 
   const renderRecentlyViewed = ({ item }) => (
-    <TouchableOpacity style={styles.recentlyViewedItem}>
+    <TouchableOpacity 
+      style={styles.recentlyViewedItem}
+      onPress={() => router.push(`/video/${item.id}`)}
+    >
       <View style={styles.recentlyViewedThumbnailContainer}>
         <Image source={item.thumbnail} style={styles.recentlyViewedThumbnail} contentFit="cover" />
         <View style={styles.recentlyViewedProgressContainer}>
-          <View style={[styles.recentlyViewedProgress, { width: `${item.progress * 100}%` }]} />
+          <View style={[styles.recentlyViewedProgress, { width: "65%" }]} />
         </View>
         <View style={styles.recentlyViewedDuration}>
           <Text style={styles.recentlyViewedDurationText}>{item.duration}</Text>
@@ -486,29 +399,36 @@ export default function ExploreScreen() {
             <Text style={styles.seeAllButton}>See All</Text>
           </TouchableOpacity>
         </View>
-        <FlatList
-          data={POPULAR_CHANNELS}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.channelCard}>
-              <Image
-                source={{ uri: item.type === 'youtube' ? item.avatar : item.logo }}
-                style={styles.channelAvatar}
-              />
-              <View style={styles.channelInfo}>
-                <Text style={styles.channelName}>{item.name}</Text>
-                <Text style={styles.channelDescription} numberOfLines={2}>
-                  {item.description}
-                </Text>
-                {item.type === 'youtube' && (
-                  <Text style={styles.subscriberCount}>{item.subscribers} subscribers</Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
-          keyExtractor={(item) => item.id}
-        />
+        {popularChannels.length > 0 ? (
+          <FlatList
+            data={popularChannels}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.channelCard}>
+                <Image
+                  source={{ uri: item.type === 'youtube' ? item.avatar : item.logo }}
+                  style={styles.channelAvatar}
+                />
+                <View style={styles.channelInfo}>
+                  <Text style={styles.channelName}>{item.name}</Text>
+                  <Text style={styles.channelDescription} numberOfLines={2}>
+                    {item.description}
+                  </Text>
+                  {item.type === 'youtube' && (
+                    <Text style={styles.subscriberCount}>{item.subscribers} subscribers</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            )}
+            keyExtractor={(item) => item.id}
+          />
+        ) : (
+          <View style={styles.emptyStateContainer}>
+            <ActivityIndicator size="large" color="#4361EE" />
+            <Text style={styles.emptyStateText}>Loading channels...</Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -527,28 +447,28 @@ export default function ExploreScreen() {
           {/* Header with greeting */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.greeting}>Hello, Alex! 👋</Text>
+              <Text style={styles.greeting}>Hello, {USER.name}! 👋</Text>
               <Text style={styles.subGreeting}>What would you like to learn today?</Text>
             </View>
             <View style={styles.userStats}>
               <View style={styles.userStatItem}>
                 <FontAwesome5 name="fire" size={16} color="#FF6B6B" />
-                <Text style={styles.userStatText}>7 day streak</Text>
+                <Text style={styles.userStatText}>{USER.streak} day streak</Text>
               </View>
               <View style={styles.userStatItem}>
                 <FontAwesome5 name="star" size={16} color="#FFD700" />
-                <Text style={styles.userStatText}>1250 points</Text>
+                <Text style={styles.userStatText}>{USER.points} points</Text>
               </View>
             </View>
           </View>
 
           {/* Search bar */}
           <View style={styles.searchContainer}>
-      <SearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="Search for topics, courses, or instructors"
-      />
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search for topics, courses, or instructors"
+            />
             <TouchableOpacity style={styles.filterButton}>
               <FontAwesome5 name="sliders-h" size={16} color="#666" />
             </TouchableOpacity>
@@ -562,70 +482,79 @@ export default function ExploreScreen() {
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-            <Animated.FlatList
-              data={FEATURED_CONTENT}
-              renderItem={renderFeaturedItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={CARD_WIDTH + CARD_SPACING}
-              decelerationRate="fast"
-              contentContainerStyle={styles.featuredList}
-              onScroll={Animated.event(
-                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                { useNativeDriver: true }
-              )}
-              scrollEventThrottle={16}
-            />
-            <View style={styles.paginationContainer}>
-              {FEATURED_CONTENT.map((_, index) => {
-                const inputRange = [
-                  (index - 1) * CARD_WIDTH,
-                  index * CARD_WIDTH,
-                  (index + 1) * CARD_WIDTH,
-                ]
+            {featuredContent.length > 0 ? (
+              <>
+                <Animated.FlatList
+                  data={featuredContent}
+                  renderItem={renderFeaturedItem}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={CARD_WIDTH + CARD_SPACING}
+                  decelerationRate="fast"
+                  contentContainerStyle={styles.featuredList}
+                  onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                    { useNativeDriver: true }
+                  )}
+                  scrollEventThrottle={16}
+                />
+                <View style={styles.paginationContainer}>
+                  {featuredContent.map((_, index) => {
+                    const inputRange = [
+                      (index - 1) * CARD_WIDTH,
+                      index * CARD_WIDTH,
+                      (index + 1) * CARD_WIDTH,
+                    ]
 
-                const dotWidth = scrollX.interpolate({
-                  inputRange,
-                  outputRange: [8, 16, 8],
-                  extrapolate: "clamp",
-                })
+                    const dotWidth = scrollX.interpolate({
+                      inputRange,
+                      outputRange: [8, 16, 8],
+                      extrapolate: "clamp",
+                    })
 
-                const opacity = scrollX.interpolate({
-                  inputRange,
-                  outputRange: [0.4, 1, 0.4],
-                  extrapolate: "clamp",
-                })
+                    const opacity = scrollX.interpolate({
+                      inputRange,
+                      outputRange: [0.4, 1, 0.4],
+                      extrapolate: "clamp",
+                    })
 
-                return (
-                  <Animated.View
-                    key={index}
-                    style={[
-                      styles.paginationDot,
-                      { width: dotWidth, opacity },
-                    ]}
-                  />
-                )
-              })}
-            </View>
+                    return (
+                      <Animated.View
+                        key={index}
+                        style={[
+                          styles.paginationDot,
+                          { width: dotWidth, opacity },
+                        ]}
+                      />
+                    )
+                  })}
+                </View>
+              </>
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <ActivityIndicator size="large" color="#4361EE" />
+                <Text style={styles.emptyStateText}>Loading featured content...</Text>
+              </View>
+            )}
           </View>
 
           {/* Categories */}
           <View style={styles.categoriesContainer}>
             <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>Browse Categories</Text>
+              <Text style={styles.sectionTitle}>Browse Categories</Text>
               <TouchableOpacity>
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-      <FlatList
-        data={CATEGORIES}
-        renderItem={renderCategoryItem}
-        keyExtractor={(item) => item.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      />
+            <FlatList
+              data={CATEGORIES}
+              renderItem={renderCategoryItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesList}
+            />
           </View>
 
           {/* Recently viewed */}
@@ -636,14 +565,21 @@ export default function ExploreScreen() {
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={RECENTLY_VIEWED}
-              renderItem={renderRecentlyViewed}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.recentlyViewedList}
-            />
+            {recentlyViewed.length > 0 ? (
+              <FlatList
+                data={recentlyViewed}
+                renderItem={renderRecentlyViewed}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.recentlyViewedList}
+              />
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <ActivityIndicator size="large" color="#4361EE" />
+                <Text style={styles.emptyStateText}>Loading recently viewed...</Text>
+              </View>
+            )}
           </View>
 
           {/* Popular instructors */}
@@ -655,7 +591,7 @@ export default function ExploreScreen() {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={POPULAR_INSTRUCTORS}
+              data={popularInstructors}
               renderItem={renderInstructor}
               keyExtractor={(item) => item.id}
               horizontal
@@ -673,7 +609,7 @@ export default function ExploreScreen() {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={LEARNING_PATHS}
+              data={learningPaths}
               renderItem={renderLearningPath}
               keyExtractor={(item) => item.id}
               horizontal
@@ -685,19 +621,26 @@ export default function ExploreScreen() {
           {/* Trending courses */}
           <View style={styles.trendingContainer}>
             <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>Trending Courses</Text>
+              <Text style={styles.sectionTitle}>Trending Courses</Text>
               <TouchableOpacity>
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-      <FlatList
-        data={TRENDING_COURSES}
-        renderItem={renderTrendingCourse}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.trendingList}
-              scrollEnabled={false}
-            />
+            {trendingCourses.length > 0 ? (
+              <FlatList
+                data={trendingCourses}
+                renderItem={renderTrendingCourse}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.trendingList}
+                scrollEnabled={false}
+              />
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <ActivityIndicator size="large" color="#4361EE" />
+                <Text style={styles.emptyStateText}>Loading trending courses...</Text>
+              </View>
+            )}
           </View>
 
           {/* Modern video cards */}
@@ -708,14 +651,21 @@ export default function ExploreScreen() {
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-            {videos.map((video) => (
-              <ModernVideoCard
-                key={video.id}
-                video={video}
-                onPress={() => router.push(`/video/${video.id}`)}
-                style={styles.videoCard}
-              />
-            ))}
+            {videos.length > 0 ? (
+              videos.map((video) => (
+                <ModernVideoCard
+                  key={video.id}
+                  video={video}
+                  onPress={() => router.push(`/video/${video.id}`)}
+                  style={styles.videoCard}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <ActivityIndicator size="large" color="#4361EE" />
+                <Text style={styles.emptyStateText}>Loading recommendations...</Text>
+              </View>
+            )}
           </View>
 
           {renderPopularChannels()}
@@ -1245,4 +1195,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
   },
+  emptyStateContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+  },
 })
+

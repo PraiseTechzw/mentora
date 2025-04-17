@@ -11,6 +11,7 @@ import * as Permissions from 'expo-permissions'
 import * as FileSystem from 'expo-file-system'
 import * as MediaLibrary from 'expo-media-library'
 import * as Sharing from 'expo-sharing'
+import youtubeDl from 'youtube-dl-exec'
 
 export default function VideoScreen() {
   const params = useLocalSearchParams()
@@ -258,41 +259,38 @@ export default function VideoScreen() {
       
       const fileUri = `${downloadDir}${filename}`;
       
-      // For a real implementation, we would use a YouTube download API
-      // This is a placeholder for demonstration purposes
-      // In a production app, you would use a proper YouTube download service
+      // Download the video using youtube-dl
+      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
       
-      // Simulate download progress
-      let progress = 0;
-      const interval = setInterval(() => {
-        progress += 0.05;
-        setDownloadProgress(progress);
+      try {
+        await youtubeDl(videoUrl, {
+          output: fileUri,
+          format: 'best[ext=mp4]',
+          noCheckCertificates: true,
+          noWarnings: true,
+          preferFreeFormats: true,
+          addHeader: ['referer:youtube.com', 'user-agent:googlebot']
+        });
         
-        if (progress >= 1) {
-          clearInterval(interval);
-          
-          // Create a sample video file for demonstration
-          // In a real app, this would be the actual downloaded file
-          const sampleVideoContent = 'Sample video content';
-          
-          // Save to media library
-          saveVideoToMediaLibrary(fileUri, sampleVideoContent);
-        }
-      }, 300);
+        // Save to media library
+        await saveVideoToMediaLibrary(fileUri);
+        
+      } catch (error) {
+        console.error('Error downloading video:', error);
+        Alert.alert('Error', 'Failed to download the video. Please try again later.');
+        setIsDownloading(false);
+      }
       
     } catch (error) {
-      console.error('Error downloading:', error);
+      console.error('Error in download process:', error);
       Alert.alert('Error', 'Failed to download the video');
       setIsDownloading(false);
     }
   }
   
   // Helper function to save video to media library
-  const saveVideoToMediaLibrary = async (fileUri, content) => {
+  const saveVideoToMediaLibrary = async (fileUri) => {
     try {
-      // Write the sample content to the file
-      await FileSystem.writeAsStringAsync(fileUri, content);
-      
       // Save to media library
       const asset = await MediaLibrary.createAssetAsync(fileUri);
       
