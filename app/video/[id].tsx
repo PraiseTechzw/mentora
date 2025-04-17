@@ -90,7 +90,7 @@ export default function VideoScreen() {
           // Convert YouTube URLs to embed format if needed
           if (!videoUrl.includes('embed')) {
             const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
-            videoUrl = `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0`;
+            videoUrl = `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&autoplay=1&playsinline=1`;
           }
         }
 

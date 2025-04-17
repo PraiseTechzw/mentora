@@ -253,18 +253,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Handle video progress
   const handleProgress = (event: any) => {
-    if (event.nativeEvent.progress) {
-      const progress = event.nativeEvent.progress
-      const currentTime = progress * duration
+    const progress = event.nativeEvent.progress;
+    if (progress !== null && progress !== undefined && !isNaN(progress)) {
+      const currentTime = progress * duration;
       console.log('Video progress:', {
         progress,
         currentTime,
         duration,
         title
       });
-      setCurrentTime(currentTime)
-      progressWidth.value = progress * 100
-      onProgress?.(progress)
+      setCurrentTime(currentTime);
+      progressWidth.value = progress * 100;
+      onProgress?.(progress);
+    } else {
+      console.warn('Invalid progress value received:', progress);
     }
   }
 
