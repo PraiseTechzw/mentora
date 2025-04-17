@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from "react"
-import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Animated, Dimensions } from "react-native"
+import { StyleSheet, View, Text, ActivityIndicator, TouchableOpacity, Animated, Dimensions, Share, Alert, Platform } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
 import { getAggregatedContent } from "../../services/content-aggregator"
 import VideoPlayer from "../../components/ModernVideoPlayer"
 import { FontAwesome5 } from "@expo/vector-icons"
-import { LinearGradient } from "expo-linear-gradient"
 import { BlurView } from "expo-blur"
+import * as Permissions from 'expo-permissions'
+import * as FileSystem from 'expo-file-system'
+import * as MediaLibrary from 'expo-media-library'
 
 export default function VideoScreen() {
   const params = useLocalSearchParams()
@@ -18,6 +20,16 @@ export default function VideoScreen() {
   const [activeTab, setActiveTab] = useState('info')
   const scrollY = useRef(new Animated.Value(0)).current
   const { width } = Dimensions.get('window')
+  
+  // State for interactive elements
+  const [isLiked, setIsLiked] = useState(false)
+  const [isDisliked, setIsDisliked] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+  const [dislikeCount, setDislikeCount] = useState(0)
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(0)
 
   useEffect(() => {
     loadVideoData()
@@ -35,6 +47,10 @@ export default function VideoScreen() {
           const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop()
           videoUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&enablejsapi=1`
         }
+        
+        // Set random like/dislike counts for demo
+        setLikeCount(Math.floor(Math.random() * 10000))
+        setDislikeCount(Math.floor(Math.random() * 1000))
         
         setVideo({ ...videoData, videoUrl })
         setRelatedVideos(allVideos.filter(v => v.id !== params.id).slice(0, 5))
@@ -57,6 +73,174 @@ export default function VideoScreen() {
     outputRange: [-50, 0],
     extrapolate: 'clamp',
   })
+
+  // Handle like button press
+  const handleLike = () => {
+    if (isLiked) {
+      setIsLiked(false)
+      setLikeCount(prev => prev - 1)
+    } else {
+      setIsLiked(true)
+      setLikeCount(prev => prev + 1)
+      // If previously disliked, remove dislike
+      if (isDisliked) {
+        setIsDisliked(false)
+        setDislikeCount(prev => prev - 1)
+      }
+    }
+  }
+
+  // Handle dislike button press
+  const handleDislike = () => {
+    if (isDisliked) {
+      setIsDisliked(false)
+      setDislikeCount(prev => prev - 1)
+    } else {
+      setIsDisliked(true)
+      setDislikeCount(prev => prev + 1)
+      // If previously liked, remove like
+      if (isLiked) {
+        setIsLiked(false)
+        setLikeCount(prev => prev - 1)
+      }
+    }
+  }
+
+  // Handle share button press
+  const handleShare = async () => {
+    try {
+      const result = await Share.share({
+        message: `Check out this video: ${video?.title} - ${video?.videoUrl}`,
+        title: video?.title,
+      });
+      
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          console.log(`Shared with activity type: ${result.activityType}`);
+        } else {
+          console.log('Shared successfully');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        console.log('Share dismissed');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      Alert.alert('Error', 'Failed to share the video');
+    }
+  }
+
+  // Handle download button press
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true);
+      
+      // Request permissions
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Please grant permission to download videos');
+        setIsDownloading(false);
+        return;
+      }
+      
+      // Get video ID from URL
+      let videoId = '';
+      if (video?.videoUrl.includes('youtube.com/embed/')) {
+        videoId = video.videoUrl.split('youtube.com/embed/')[1].split('?')[0];
+      } else if (video?.videoUrl.includes('youtube.com/watch?v=')) {
+        videoId = video.videoUrl.split('v=')[1].split('&')[0];
+      } else if (video?.videoUrl.includes('youtu.be/')) {
+        videoId = video.videoUrl.split('youtu.be/')[1].split('?')[0];
+      }
+      
+      if (!videoId) {
+        Alert.alert('Error', 'Could not extract video ID');
+        setIsDownloading(false);
+        return;
+      }
+      
+      // Create a unique filename
+      const timestamp = new Date().getTime();
+      const filename = `${videoId}_${timestamp}.mp4`;
+      
+      // For demo purposes, we'll use a placeholder URL
+      // In a real app, you would use a proper video download URL
+      const downloadUrl = `https://example.com/download/${videoId}`;
+      
+      // Create a download directory if it doesn't exist
+      const downloadDir = `${FileSystem.documentDirectory}downloads/`;
+      const dirInfo = await FileSystem.getInfoAsync(downloadDir);
+      
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(downloadDir, { intermediates: true });
+      }
+      
+      const fileUri = `${downloadDir}${filename}`;
+      
+      // Start the download with progress tracking
+      const downloadResumable = FileSystem.createDownloadResumable(
+        downloadUrl,
+        fileUri,
+        {},
+        (downloadProgress) => {
+          const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+          setDownloadProgress(progress);
+        }
+      );
+      
+      // For demo purposes, we'll simulate a download since we can't actually download YouTube videos
+      // In a real app, you would use the downloadResumable.downloadAsync() method
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 0.05;
+        setDownloadProgress(progress);
+        
+        if (progress >= 1) {
+          clearInterval(interval);
+          
+          // Save to media library
+          MediaLibrary.saveToLibraryAsync(fileUri)
+            .then(() => {
+              setIsDownloading(false);
+              setDownloadProgress(0);
+              Alert.alert('Success', 'Video downloaded successfully');
+            })
+            .catch(error => {
+              console.error('Error saving to media library:', error);
+              Alert.alert('Error', 'Failed to save video to media library');
+              setIsDownloading(false);
+            });
+        }
+      }, 300);
+      
+    } catch (error) {
+      console.error('Error downloading:', error);
+      Alert.alert('Error', 'Failed to download the video');
+      setIsDownloading(false);
+    }
+  }
+
+  // Handle subscribe button press
+  const handleSubscribe = () => {
+    setIsSubscribed(!isSubscribed);
+    Alert.alert(
+      isSubscribed ? 'Unsubscribed' : 'Subscribed',
+      isSubscribed 
+        ? `You have unsubscribed from ${video?.channelName}` 
+        : `You have subscribed to ${video?.channelName}`
+    );
+  }
+
+  // Handle bookmark button press
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked);
+    Alert.alert(
+      isBookmarked ? 'Removed from Bookmarks' : 'Added to Bookmarks',
+      isBookmarked 
+        ? `${video?.title} has been removed from your bookmarks` 
+        : `${video?.title} has been added to your bookmarks`
+    );
+  }
 
   const renderHeader = () => {
     return (
@@ -117,8 +301,15 @@ export default function VideoScreen() {
       <View style={styles.infoContainer}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>{video?.title}</Text>
-          <TouchableOpacity style={styles.bookmarkButton}>
-            <FontAwesome5 name="bookmark" size={18} color="#00E0FF" />
+          <TouchableOpacity 
+            style={styles.bookmarkButton}
+            onPress={handleBookmark}
+          >
+            <FontAwesome5 
+              name={isBookmarked ? "bookmark" : "bookmark"} 
+              size={18} 
+              color={isBookmarked ? "#00E0FF" : "#AAA"} 
+            />
           </TouchableOpacity>
         </View>
         
@@ -132,11 +323,22 @@ export default function VideoScreen() {
               <Text style={styles.subscriberCount}>1.2M subscribers</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.subscribeButton}>
-            <Text style={styles.subscribeText}>Subscribe</Text>
+          <TouchableOpacity 
+            style={[
+              styles.subscribeButton,
+              isSubscribed && styles.subscribedButton
+            ]}
+            onPress={handleSubscribe}
+          >
+            <Text style={[
+              styles.subscribeText,
+              isSubscribed && styles.subscribedText
+            ]}>
+              {isSubscribed ? 'Subscribed' : 'Subscribe'}
+            </Text>
           </TouchableOpacity>
         </View>
-
+        
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>24.5K</Text>
@@ -144,32 +346,70 @@ export default function VideoScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>1.2K</Text>
+            <Text style={styles.statValue}>{likeCount.toLocaleString()}</Text>
             <Text style={styles.statLabel}>Likes</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>45</Text>
-            <Text style={styles.statLabel}>Comments</Text>
+            <Text style={styles.statValue}>{dislikeCount.toLocaleString()}</Text>
+            <Text style={styles.statLabel}>Dislikes</Text>
           </View>
         </View>
         
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionButton}>
-            <FontAwesome5 name="thumbs-up" size={16} color="#FFF" />
-            <Text style={styles.actionText}>Like</Text>
-              </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <FontAwesome5 name="thumbs-down" size={16} color="#FFF" />
-            <Text style={styles.actionText}>Dislike</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleLike}
+          >
+            <FontAwesome5 
+              name="thumbs-up" 
+              size={16} 
+              color={isLiked ? "#00E0FF" : "#FFF"} 
+            />
+            <Text style={[
+              styles.actionText,
+              isLiked && styles.activeActionText
+            ]}>Like</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleDislike}
+          >
+            <FontAwesome5 
+              name="thumbs-down" 
+              size={16} 
+              color={isDisliked ? "#FF6B6B" : "#FFF"} 
+            />
+            <Text style={[
+              styles.actionText,
+              isDisliked && styles.dislikeActionText
+            ]}>Dislike</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleShare}
+          >
             <FontAwesome5 name="share" size={16} color="#FFF" />
-                <Text style={styles.actionText}>Share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-            <FontAwesome5 name="download" size={16} color="#FFF" />
-                <Text style={styles.actionText}>Download</Text>
+            <Text style={styles.actionText}>Share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleDownload}
+            disabled={isDownloading}
+          >
+            {isDownloading ? (
+              <View style={styles.downloadProgressContainer}>
+                <ActivityIndicator size="small" color="#FFF" />
+                <Text style={styles.downloadProgressText}>
+                  {Math.round(downloadProgress * 100)}%
+                </Text>
+              </View>
+            ) : (
+              <FontAwesome5 name="download" size={16} color="#FFF" />
+            )}
+            <Text style={styles.actionText}>
+              {isDownloading ? 'Downloading' : 'Download'}
+            </Text>
           </TouchableOpacity>
         </View>
         
@@ -628,5 +868,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#AAA',
     marginRight: 16,
+  },
+  // Add new styles for interactive elements
+  subscribedButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  subscribedText: {
+    color: '#FFF',
+  },
+  activeActionText: {
+    color: '#00E0FF',
+  },
+  dislikeActionText: {
+    color: '#FF6B6B',
+  },
+  downloadProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadProgressText: {
+    color: '#FFF',
+    fontSize: 10,
+    marginLeft: 4,
   },
 })
