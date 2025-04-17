@@ -1,4 +1,13 @@
 import { supabase, Database } from './supabase-client';
+import { UserData } from './user-service';
+
+// Types
+interface YouTubeVideo {
+  id: string;
+  title: string;
+  thumbnail: string;
+  duration: string;
+}
 
 // User operations
 export async function getUserProfile(userId: string) {
@@ -30,6 +39,243 @@ export async function updateUserProfile(userId: string, updates: Database['publi
   }
 
   return data;
+}
+
+// User data operations
+export async function syncUserData(userId: string, userData: UserData) {
+  try {
+    // Update user profile with data from local storage
+    const { data, error } = await supabase
+      .from('users')
+      .update({
+        name: userData.name,
+        email: userData.email,
+        avatar_url: userData.avatar,
+        preferences: userData.preferences,
+        points: userData.points,
+        streak: userData.streak,
+        last_login_date: userData.lastLoginDate,
+        completed_courses: userData.completedCourses,
+        bookmarked_videos: userData.bookmarkedVideos,
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error syncing user data:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error syncing user data:', error);
+    return null;
+  }
+}
+
+export async function getUserData(userId: string): Promise<UserData | null> {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user data:', error);
+      return null;
+    }
+
+    // Convert database format to UserData format
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      avatar: data.avatar_url,
+      points: data.points || 0,
+      streak: data.streak || 0,
+      lastLoginDate: data.last_login_date || new Date().toISOString(),
+      preferences: data.preferences || [],
+      completedCourses: data.completed_courses || [],
+      bookmarkedVideos: data.bookmarked_videos || [],
+    };
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    return null;
+  }
+}
+
+export async function updateUserPoints(userId: string, pointsToAdd: number): Promise<UserData | null> {
+  try {
+    // First get current user data
+    const currentData = await getUserData(userId);
+    if (!currentData) return null;
+
+    // Calculate new points
+    const newPoints = currentData.points + pointsToAdd;
+
+    // Update in database
+    const { data, error } = await supabase
+      .from('users')
+      .update({ points: newPoints })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating user points:', error);
+      return null;
+    }
+
+    // Return updated user data
+    return {
+      ...currentData,
+      points: newPoints,
+    };
+  } catch (error) {
+    console.error('Error updating user points:', error);
+    return null;
+  }
+}
+
+export async function updateUserStreak(userId: string, streak: number): Promise<UserData | null> {
+  try {
+    // Update in database
+    const { data, error } = await supabase
+      .from('users')
+      .update({ 
+        streak: streak,
+        last_login_date: new Date().toISOString()
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating user streak:', error);
+      return null;
+    }
+
+    // Get updated user data
+    return await getUserData(userId);
+  } catch (error) {
+    console.error('Error updating user streak:', error);
+    return null;
+  }
+}
+
+export async function addCompletedCourse(userId: string, videoId: string): Promise<UserData | null> {
+  try {
+    // First get current user data
+    const currentData = await getUserData(userId);
+    if (!currentData) return null;
+
+    // Check if video is already completed
+    if (currentData.completedCourses.includes(videoId)) {
+      return currentData;
+    }
+
+    // Add video to completed courses
+    const updatedCompletedCourses = [...currentData.completedCourses, videoId];
+
+    // Update in database
+    const { data, error } = await supabase
+      .from('users')
+      .update({ 
+        completed_courses: updatedCompletedCourses,
+        points: currentData.points + 10 // Add points for completing a video
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding completed course:', error);
+      return null;
+    }
+
+    // Return updated user data
+    return {
+      ...currentData,
+      completedCourses: updatedCompletedCourses,
+      points: currentData.points + 10,
+    };
+  } catch (error) {
+    console.error('Error adding completed course:', error);
+    return null;
+  }
+}
+
+export async function addBookmarkedVideo(userId: string, videoId: string): Promise<UserData | null> {
+  try {
+    // First get current user data
+    const currentData = await getUserData(userId);
+    if (!currentData) return null;
+
+    // Check if video is already bookmarked
+    if (currentData.bookmarkedVideos.includes(videoId)) {
+      return currentData;
+    }
+
+    // Add video to bookmarked videos
+    const updatedBookmarkedVideos = [...currentData.bookmarkedVideos, videoId];
+
+    // Update in database
+    const { data, error } = await supabase
+      .from('users')
+      .update({ bookmarked_videos: updatedBookmarkedVideos })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding bookmarked video:', error);
+      return null;
+    }
+
+    // Return updated user data
+    return {
+      ...currentData,
+      bookmarkedVideos: updatedBookmarkedVideos,
+    };
+  } catch (error) {
+    console.error('Error adding bookmarked video:', error);
+    return null;
+  }
+}
+
+export async function removeBookmarkedVideo(userId: string, videoId: string): Promise<UserData | null> {
+  try {
+    // First get current user data
+    const currentData = await getUserData(userId);
+    if (!currentData) return null;
+
+    // Remove video from bookmarked videos
+    const updatedBookmarkedVideos = currentData.bookmarkedVideos.filter(id => id !== videoId);
+
+    // Update in database
+    const { data, error } = await supabase
+      .from('users')
+      .update({ bookmarked_videos: updatedBookmarkedVideos })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error removing bookmarked video:', error);
+      return null;
+    }
+
+    // Return updated user data
+    return {
+      ...currentData,
+      bookmarkedVideos: updatedBookmarkedVideos,
+    };
+  } catch (error) {
+    console.error('Error removing bookmarked video:', error);
+    return null;
+  }
 }
 
 // Watch history operations
@@ -174,6 +420,12 @@ export async function signUp(email: string, password: string, name: string) {
       id: data.user.id,
       email: data.user.email,
       name: name,
+      points: 0,
+      streak: 0,
+      last_login_date: new Date().toISOString(),
+      preferences: [],
+      completed_courses: [],
+      bookmarked_videos: [],
     });
   }
 
@@ -189,6 +441,13 @@ export async function signIn(email: string, password: string) {
   if (error) {
     console.error('Error signing in:', error);
     return { user: null, error };
+  }
+
+  // Update last login date
+  if (data.user) {
+    await supabase.from('users').update({
+      last_login_date: new Date().toISOString(),
+    }).eq('id', data.user.id);
   }
 
   return { user: data.user, error: null };
@@ -214,4 +473,30 @@ export async function getCurrentUser() {
   }
 
   return data.user;
+}
+
+export async function resetPassword(email: string) {
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: 'mentora://auth/reset-password',
+  });
+
+  if (error) {
+    console.error('Error resetting password:', error);
+    return { success: false, error };
+  }
+
+  return { success: true, error: null };
+}
+
+export async function updatePassword(newPassword: string) {
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+
+  if (error) {
+    console.error('Error updating password:', error);
+    return { success: false, error };
+  }
+
+  return { success: true, error: null };
 } 
