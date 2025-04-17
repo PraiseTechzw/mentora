@@ -191,7 +191,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           initialPlayerParams={{
             modestbranding: true,
             rel: false,
-            controls: false
+            controls: true,
+            enablejsapi: true,
+            origin: "https://www.youtube.com"
           }}
           webViewProps={{
             allowsInlineMediaPlayback: true,
@@ -220,20 +222,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </View>
         )}
       </View>
-
-      {/* Floating controls that appear on touch */}
-      <TouchableOpacity 
-        style={styles.floatingControls}
-        onPress={() => setPlaying(!playing)}
-      >
-        <View style={styles.controlButton}>
-          <Ionicons 
-            name={playing ? "pause" : "play"} 
-            size={24} 
-            color="#FFF" 
-          />
-        </View>
-      </TouchableOpacity>
     </View>
   )
 }
@@ -305,21 +293,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-  } as ViewStyle,
-  floatingControls: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [
-      { translateX: Number(-25) },
-      { translateY: Number(-25) }
-    ],
-    opacity: 0.8,
-  } as ViewStyle,
-  controlButton: {
-    padding: 12,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   } as ViewStyle,
 })
 
