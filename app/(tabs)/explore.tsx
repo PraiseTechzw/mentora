@@ -16,9 +16,8 @@ import {
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
-import { FontAwesome5, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons"
+import { FontAwesome5 } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
-import { BlurView } from "expo-blur"
 import { useRouter } from "expo-router"
 
 import { SearchBar } from "../../components/SearchBar"
@@ -296,24 +295,6 @@ export default function ExploreScreen() {
     </TouchableOpacity>
   )
 
-  const renderInstructor = ({ item }) => (
-    <TouchableOpacity style={styles.instructorCard}>
-      <Image source={item.avatar} style={styles.instructorAvatar} contentFit="cover" />
-      <View style={styles.instructorInfo}>
-        <Text style={styles.instructorName}>{item.name}</Text>
-        <Text style={styles.instructorSpecialty}>{item.specialty}</Text>
-        <View style={styles.instructorFollowers}>
-          <FontAwesome5 name="users" size={12} color="#666" />
-          <Text style={styles.instructorFollowersText}>
-            {item.followers.toLocaleString()} followers
-          </Text>
-        </View>
-      </View>
-      <TouchableOpacity style={styles.followButton}>
-        <Text style={styles.followButtonText}>Follow</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  )
 
   const renderLearningPath = ({ item }) => (
     <TouchableOpacity style={styles.learningPathCard}>
@@ -419,7 +400,6 @@ export default function ExploreScreen() {
           <View style={styles.header}>
             <View>
               <Text style={styles.greeting}>{getDayOfWeek()}</Text>
-              <Text style={styles.subGreeting}>What would you like to learn today?</Text>
             </View>
             <View style={styles.userStats}>
               <View style={styles.userStatItem}>
