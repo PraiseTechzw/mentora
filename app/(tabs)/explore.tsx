@@ -385,6 +385,16 @@ export default function ExploreScreen() {
     );
   };
 
+  // Update the section headers to include "See All" buttons
+  const renderSectionHeader = (title: string, route: string) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <TouchableOpacity onPress={() => router.push(route)}>
+        <Text style={styles.seeAllButton}>See All</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {isLoading ? (
@@ -415,132 +425,116 @@ export default function ExploreScreen() {
 
           {/* Search bar */}
           <View style={styles.searchContainer}>
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search for topics, courses, or instructors"
-            />
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search for topics, courses, or instructors"
+      />
             <TouchableOpacity style={styles.filterButton}>
               <FontAwesome5 name="sliders-h" size={16} color="#666" />
             </TouchableOpacity>
           </View>
 
           {/* Featured content carousel */}
-          <View style={styles.featuredContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Featured</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            {featuredContent.length > 0 ? (
-              <>
-                <Animated.FlatList
-                  data={featuredContent}
-                  renderItem={renderFeaturedItem}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  snapToInterval={CARD_WIDTH + CARD_SPACING}
-                  decelerationRate="fast"
-                  contentContainerStyle={styles.featuredList}
-                  onScroll={Animated.event(
-                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { useNativeDriver: true }
-                  )}
-                  scrollEventThrottle={16}
-                />
-                <View style={styles.paginationContainer}>
-                  {featuredContent.map((_, index) => {
-                    const inputRange = [
-                      (index - 1) * CARD_WIDTH,
-                      index * CARD_WIDTH,
-                      (index + 1) * CARD_WIDTH,
-                    ]
+          <View style={styles.section}>
+            {renderSectionHeader('Featured Content', '/see-all/videos')}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredContainer}>
+              {featuredContent.length > 0 ? (
+                <>
+                  <Animated.FlatList
+                    data={featuredContent}
+                    renderItem={renderFeaturedItem}
+                    keyExtractor={(item) => item.id}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    snapToInterval={CARD_WIDTH + CARD_SPACING}
+                    decelerationRate="fast"
+                    contentContainerStyle={styles.featuredList}
+                    onScroll={Animated.event(
+                      [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                      { useNativeDriver: true }
+                    )}
+                    scrollEventThrottle={16}
+                  />
+                  <View style={styles.paginationContainer}>
+                    {featuredContent.map((_, index) => {
+                      const inputRange = [
+                        (index - 1) * CARD_WIDTH,
+                        index * CARD_WIDTH,
+                        (index + 1) * CARD_WIDTH,
+                      ]
 
-                    const dotWidth = scrollX.interpolate({
-                      inputRange,
-                      outputRange: [8, 16, 8],
-                      extrapolate: "clamp",
-                    })
+                      const dotWidth = scrollX.interpolate({
+                        inputRange,
+                        outputRange: [8, 16, 8],
+                        extrapolate: "clamp",
+                      })
 
-                    const opacity = scrollX.interpolate({
-                      inputRange,
-                      outputRange: [0.4, 1, 0.4],
-                      extrapolate: "clamp",
-                    })
+                      const opacity = scrollX.interpolate({
+                        inputRange,
+                        outputRange: [0.4, 1, 0.4],
+                        extrapolate: "clamp",
+                      })
 
-                    return (
-                      <Animated.View
-                        key={index}
-                        style={[
-                          styles.paginationDot,
-                          { width: dotWidth, opacity },
-                        ]}
-                      />
-                    )
-                  })}
+                      return (
+                        <Animated.View
+                          key={index}
+                          style={[
+                            styles.paginationDot,
+                            { width: dotWidth, opacity },
+                          ]}
+                        />
+                      )
+                    })}
+                  </View>
+                </>
+              ) : (
+                <View style={styles.emptyStateContainer}>
+                  <ActivityIndicator size="large" color="#4361EE" />
+                  <Text style={styles.emptyStateText}>Loading featured content...</Text>
                 </View>
-              </>
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <ActivityIndicator size="large" color="#4361EE" />
-                <Text style={styles.emptyStateText}>Loading featured content...</Text>
-              </View>
-            )}
+              )}
+            </ScrollView>
           </View>
 
           {/* Categories */}
           <View style={styles.categoriesContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Browse Categories</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
+            {renderSectionHeader('Browse Categories', '/see-all/categories')}
+      <FlatList
               data={categories}
-              renderItem={renderCategoryItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesList}
-            />
+        renderItem={renderCategoryItem}
+        keyExtractor={(item) => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoriesList}
+      />
           </View>
 
           {/* Recently viewed */}
-          <View style={styles.recentlyViewedContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recently Viewed</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            {recentlyViewed.length > 0 ? (
-              <FlatList
-                data={recentlyViewed}
-                renderItem={renderRecentlyViewed}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.recentlyViewedList}
-              />
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <ActivityIndicator size="large" color="#4361EE" />
-                <Text style={styles.emptyStateText}>Loading recently viewed...</Text>
-              </View>
-            )}
+          <View style={styles.section}>
+            {renderSectionHeader('Recently Viewed', '/see-all/videos')}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recentlyViewedContainer}>
+              {recentlyViewed.length > 0 ? (
+                <FlatList
+                  data={recentlyViewed}
+                  renderItem={renderRecentlyViewed}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.recentlyViewedList}
+                />
+              ) : (
+                <View style={styles.emptyStateContainer}>
+                  <ActivityIndicator size="large" color="#4361EE" />
+                  <Text style={styles.emptyStateText}>Loading recently viewed...</Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
 
           {/* Learning paths */}
           <View style={styles.learningPathsContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Learning Paths</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>See All</Text>
-              </TouchableOpacity>
-            </View>
+            {renderSectionHeader('Learning Paths', '/see-all/learning-paths')}
             <FlatList
               data={learningPaths}
               renderItem={renderLearningPath}
@@ -552,38 +546,30 @@ export default function ExploreScreen() {
           </View>
 
           {/* Trending courses */}
-          <View style={styles.trendingContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Trending Courses</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            {trendingCourses.length > 0 ? (
-              <FlatList
-                data={trendingCourses}
-                renderItem={renderTrendingCourse}
-                keyExtractor={(item) => item.id}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.trendingList}
-                scrollEnabled={false}
-              />
-            ) : (
-              <View style={styles.emptyStateContainer}>
-                <ActivityIndicator size="large" color="#4361EE" />
-                <Text style={styles.emptyStateText}>Loading trending courses...</Text>
-              </View>
-            )}
+          <View style={styles.section}>
+            {renderSectionHeader('Trending Courses', '/see-all/courses')}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.coursesContainer}>
+              {trendingCourses.length > 0 ? (
+      <FlatList
+                  data={trendingCourses}
+        renderItem={renderTrendingCourse}
+        keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.trendingList}
+                  scrollEnabled={false}
+                />
+              ) : (
+                <View style={styles.emptyStateContainer}>
+                  <ActivityIndicator size="large" color="#4361EE" />
+                  <Text style={styles.emptyStateText}>Loading trending courses...</Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
 
           {/* Modern video cards */}
           <View style={styles.videosContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recommended for You</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>See All</Text>
-              </TouchableOpacity>
-            </View>
+            {renderSectionHeader('Recommended for You', '/see-all/videos')}
             {videos.length > 0 ? (
               videos.map((video) => (
                 <ModernVideoCard
