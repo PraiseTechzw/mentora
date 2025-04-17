@@ -9,7 +9,7 @@ import { FontAwesome5 } from "@expo/vector-icons"
 import { BlurView } from "expo-blur"
 import * as Permissions from 'expo-permissions'
 import * as FileSystem from 'expo-file-system'
-import * as MediaLibrary from 'expo-media-library'
+import { MediaLibrary } from 'expo-media-library'
 
 export default function VideoScreen() {
   const params = useLocalSearchParams()
