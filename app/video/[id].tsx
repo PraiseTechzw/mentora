@@ -105,12 +105,18 @@ export default function VideoScreen() {
       // Ensure videoUrl is properly formatted
       let videoUrl = videoData.videoUrl;
       if (videoData.source === 'embedded') {
-        // For YouTube videos, we'll use a direct video URL if possible
-        if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+        // Convert YouTube URLs to embed format if needed
+        if (!videoUrl.includes('embed')) {
           const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
-          // Use a direct video URL format that works better in React Native
-          // This is a fallback approach - if this doesn't work, we'll need to use a different method
-          videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+          // Use a simpler embed URL format that works better in React Native
+          videoUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&controls=1`;
+        } else {
+          // Add necessary parameters to existing embed URL
+          const url = new URL(videoUrl);
+          url.searchParams.set('autoplay', '1');
+          url.searchParams.set('playsinline', '1');
+          url.searchParams.set('controls', '1');
+          videoUrl = url.toString();
         }
       }
 
@@ -346,9 +352,9 @@ export default function VideoScreen() {
               channelName={video.channelName}
               autoPlay={true}
               showControlsInitially={true}
-              onProgress={handleVideoProgress}
-              onComplete={handleVideoComplete}
-            />
+            onProgress={handleVideoProgress}
+            onComplete={handleVideoComplete}
+          />
           ) : (
             <View style={styles.errorContainer}>
               <Ionicons name="alert-circle" size={36} color="#00E0FF" />
@@ -369,33 +375,33 @@ export default function VideoScreen() {
             </View>
           </View>
 
-          {/* Action Buttons */}
-          <View style={styles.actionsContainer}>
+            {/* Action Buttons */}
+            <View style={styles.actionsContainer}>
             <TouchableOpacity
               style={[styles.actionButton, likeStatus === "liked" && styles.activeActionButton]}
               onPress={handleLike}
             >
               <Ionicons name="thumbs-up" size={22} color={likeStatus === "liked" ? "#00E0FF" : "#FFF"} />
-              <Text style={[styles.actionText, likeStatus === "liked" && styles.activeActionText]}>
+                <Text style={[styles.actionText, likeStatus === "liked" && styles.activeActionText]}>
                 {video?.rating || video?.views || "0"}
-              </Text>
-            </TouchableOpacity>
+                </Text>
+              </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionButton, likeStatus === "disliked" && styles.activeActionButton]}
               onPress={handleDislike}
             >
               <Ionicons name="thumbs-down" size={22} color={likeStatus === "disliked" ? "#00E0FF" : "#FFF"} />
-              <Text style={[styles.actionText, likeStatus === "disliked" && styles.activeActionText]}>Dislike</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
+                <Text style={[styles.actionText, likeStatus === "disliked" && styles.activeActionText]}>Dislike</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
               <Ionicons name="share-social" size={22} color="#FFF" />
-              <Text style={styles.actionText}>Share</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
+                <Text style={styles.actionText}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
               <Ionicons name="download" size={22} color="#FFF" />
-              <Text style={styles.actionText}>Download</Text>
-            </TouchableOpacity>
-          </View>
+                <Text style={styles.actionText}>Download</Text>
+              </TouchableOpacity>
+            </View>
 
           {/* Channel Info */}
           <View style={styles.channelContainer}>
@@ -487,7 +493,7 @@ export default function VideoScreen() {
                         <Text style={styles.postButtonText}>
                           {isCommenting ? "Posting..." : "Post"}
                         </Text>
-                      </TouchableOpacity>
+            </TouchableOpacity>
                     </View>
                   </View>
 
@@ -499,36 +505,36 @@ export default function VideoScreen() {
                       </View>
                     ) : (
                       comments.map((comment) => (
-                        <View key={comment.id} style={styles.commentItem}>
-                          <Image source={comment.avatar} style={styles.commentAvatar} contentFit="cover" />
-                          <View style={styles.commentContent}>
-                            <View style={styles.commentHeader}>
-                              <Text style={styles.commentAuthor}>{comment.author}</Text>
-                              <Text style={styles.commentTime}>{comment.time}</Text>
-                            </View>
-                            <Text style={styles.commentText}>{comment.text}</Text>
-                            <View style={styles.commentActions}>
-                              <TouchableOpacity style={styles.commentAction}>
+                  <View key={comment.id} style={styles.commentItem}>
+                    <Image source={comment.avatar} style={styles.commentAvatar} contentFit="cover" />
+                    <View style={styles.commentContent}>
+                      <View style={styles.commentHeader}>
+                        <Text style={styles.commentAuthor}>{comment.author}</Text>
+                        <Text style={styles.commentTime}>{comment.time}</Text>
+                      </View>
+                      <Text style={styles.commentText}>{comment.text}</Text>
+                      <View style={styles.commentActions}>
+                        <TouchableOpacity style={styles.commentAction}>
                                 <Ionicons name="thumbs-up-outline" size={16} color="#AAA" />
-                                <Text style={styles.commentActionText}>{comment.likes}</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity style={styles.commentAction}>
+                          <Text style={styles.commentActionText}>{comment.likes}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.commentAction}>
                                 <Ionicons name="thumbs-down-outline" size={16} color="#AAA" />
-                              </TouchableOpacity>
-                              <TouchableOpacity style={styles.commentAction}>
-                                <Text style={styles.commentActionText}>Reply</Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        </View>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.commentAction}>
+                          <Text style={styles.commentActionText}>Reply</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
                       ))
                     )}
                   </View>
                 </View>
               )}
-            </View>
-          </View>
-        </Animated.View>
+                </View>
+              </View>
+          </Animated.View>
       </ScrollView>
 
       {/* Floating Action Button */}

@@ -23,17 +23,17 @@ interface VideoPlayerProps {
   onComplete?: () => void
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoUrl,
   thumbnailUrl,
   title = "Video Title",
   channelName = "",
   style,
-  autoPlay = true,
+  autoPlay = false,
   showControlsInitially = true,
   onProgress,
   onComplete,
-}): JSX.Element => {
+}) => {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showControlsOverlay, setShowControlsOverlay] = useState(showControlsInitially)
@@ -143,10 +143,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setShowControlsOverlay(true)
     controlsOpacity.value = withTiming(1, { duration: 200 })
 
-    if (controlsTimeout.current) {
-      clearTimeout(controlsTimeout.current)
+      if (controlsTimeout.current) {
+        clearTimeout(controlsTimeout.current)
+      }
     }
-  }
 
   // Hide controls
   const hideControls = () => {
@@ -454,130 +454,186 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <style>
-          body {
+          body, html {
             margin: 0;
             padding: 0;
-            background-color: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-          }
-          .video-container {
-            position: relative;
             width: 100%;
             height: 100%;
+            background-color: #000;
+            overflow: hidden;
           }
-          iframe {
+          .video-wrapper {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            border: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+          iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
           }
           .loading {
-            position: fixed;
+            position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             color: white;
             font-family: Arial, sans-serif;
             text-align: center;
+            z-index: 10;
+          }
+          .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto 10px;
+          }
+          @keyframes spin {
+            to { transform: rotate(360deg); }
           }
         </style>
       </head>
       <body>
-        <div class="video-container">
-          <iframe
+        <div id="loading" class="loading">
+          <div class="loading-spinner"></div>
+          <div>Loading video...</div>
+        </div>
+        <div class="video-wrapper">
+          <iframe 
+            id="videoPlayer"
             src="${videoUrl}"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowfullscreen
+            onload="handleIframeLoad()"
           ></iframe>
-          <div class="loading">Loading video...</div>
         </div>
         <script>
-          const video = document.querySelector('iframe');
-          const loading = document.querySelector('.loading');
-          const progressBar = document.querySelector('.progress-bar');
-          const timeDisplay = document.querySelector('.time');
-          const playPauseButton = document.querySelector('.play-pause');
+          let player;
+          let duration = 0;
+          let isPlayerReady = false;
+          let retryCount = 0;
+          const MAX_RETRIES = 3;
           
-          function handleVideoLoaded() {
-            console.log('Video loaded');
-            loading.style.display = 'none';
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'loaded',
-              duration: video.duration
-            }));
-            updateTimeDisplay();
-          }
-          
-          function handleTimeUpdate() {
-            const progress = (video.currentTime / video.duration) * 100;
-            progressBar.style.width = progress + '%';
-            updateTimeDisplay();
+          function handleIframeLoad() {
+            console.log('Iframe loaded');
+            const iframe = document.getElementById('videoPlayer');
+            player = iframe.contentWindow;
             
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'progress',
-              progress: video.currentTime / video.duration
-            }));
+            // Listen for YouTube player events
+            window.addEventListener('message', function(event) {
+              try {
+                console.log('Message received:', event.data);
+                const data = JSON.parse(event.data);
+                
+                if (data.event === 'onReady') {
+                  console.log('Player ready');
+                  isPlayerReady = true;
+                  requestVideoInfo();
+                } else if (data.info) {
+                  console.log('Video info received:', data.info);
+                  duration = data.info.duration;
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'loaded',
+                    duration: duration
+                  }));
+                  document.getElementById('loading').style.display = 'none';
+                } else if (data.event === 'onStateChange') {
+                  console.log('State change:', data.info);
+                  // Handle player state changes
+                  if (data.info === 1) { // Playing
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'playing'
+                    }));
+                  } else if (data.info === 2) { // Paused
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'paused'
+                    }));
+                  } else if (data.info === 3) { // Buffering
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'buffering_start'
+                    }));
+                  } else if (data.info === 5) { // Video cued
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'buffering_end'
+                    }));
+                  } else if (data.info === 0) { // Ended
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'ended'
+                    }));
+                  }
+                }
+              } catch (e) {
+                console.error('Error parsing message:', e);
+              }
+            });
+            
+            // Send ready event to YouTube player
+            player.postMessage('{"event":"listening","id":"videoPlayer","channel":"widget"}', '*');
+            
+            // Check if video is visible after a delay
+            setTimeout(checkVideoVisibility, 2000);
           }
           
-          function handleVideoEnded() {
-            console.log('Video ended');
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'ended'
-            }));
+          function checkVideoVisibility() {
+            console.log('Checking video visibility');
+            // Try to get video element
+            const videoElement = document.querySelector('video');
+            if (videoElement) {
+              console.log('Video element found');
+              // Check if video has dimensions
+              if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+                console.log('Video dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+                document.getElementById('loading').style.display = 'none';
+              } else {
+                console.log('Video has no dimensions, retrying...');
+                retryVideoLoad();
+      }
+    } else {
+              console.log('No video element found, retrying...');
+              retryVideoLoad();
+            }
           }
           
-          function handleVideoError() {
-            console.error('Video error:', video.error);
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'error',
-              message: 'Failed to load video: ' + (video.error ? video.error.message : 'Unknown error')
-            }));
-          }
-          
-          function togglePlayPause() {
-            if (video.paused) {
-              video.src = video.src;
-              playPauseButton.textContent = '⏸';
+          function retryVideoLoad() {
+            if (retryCount < MAX_RETRIES) {
+              retryCount++;
+              console.log('Retry attempt', retryCount);
+              // Reload the iframe
+              const iframe = document.getElementById('videoPlayer');
+              iframe.src = iframe.src;
+              setTimeout(checkVideoVisibility, 2000);
             } else {
-              video.src = video.src;
-              playPauseButton.textContent = '▶';
+              console.log('Max retries reached');
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'error',
+                message: 'Failed to load video after multiple attempts'
+              }));
             }
           }
           
-          function seek(event) {
-            const progress = document.querySelector('.progress');
-            const rect = progress.getBoundingClientRect();
-            const pos = (event.clientX - rect.left) / rect.width;
-            video.currentTime = pos * video.duration;
-          }
-          
-          function updateTimeDisplay() {
-            const currentMinutes = Math.floor(video.currentTime / 60);
-            const currentSeconds = Math.floor(video.currentTime % 60);
-            const durationMinutes = Math.floor(video.duration / 60);
-            const durationSeconds = Math.floor(video.duration % 60);
-            
-            timeDisplay.textContent = 
-              currentMinutes + ':' + (currentSeconds < 10 ? '0' : '') + currentSeconds + ' / ' +
-              durationMinutes + ':' + (durationSeconds < 10 ? '0' : '') + durationSeconds;
-          }
-          
-          // Check if video is playing after a delay
-          setTimeout(() => {
-            if (video.readyState >= 2) {
-              loading.style.display = 'none';
+          // Request video info periodically until we get the duration
+          function requestVideoInfo() {
+            if (player && !duration) {
+              player.postMessage('{"event":"command","func":"getVideoData","args":""}', '*');
+              setTimeout(requestVideoInfo, 1000);
             }
-          }, 3000);
+          }
+          
+          // Start requesting video info
+          setTimeout(requestVideoInfo, 1000);
         </script>
       </body>
     </html>
-  `;
+  `
 
   return (
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
@@ -594,8 +650,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           mediaPlaybackRequiresUserAction={false}
           onMessage={handleWebViewMessage}
           onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            setError(`WebView error: ${nativeEvent.description}`);
+            const { nativeEvent } = syntheticEvent
+            setError(`WebView error: ${nativeEvent.description}`)
           }}
         />
 
@@ -618,26 +674,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             style={styles.gradient}
           >
             {/* Top Controls */}
-            <View style={styles.topControls}>
+              <View style={styles.topControls}>
               {isFullscreen && (
                 <TouchableOpacity style={styles.backButton} onPress={() => setIsFullscreen(false)}>
                   <Ionicons name="chevron-down" size={24} color="#FFF" />
                 </TouchableOpacity>
               )}
               <Text style={styles.title} numberOfLines={1}>
-                {title}
-              </Text>
+                  {title}
+                </Text>
               <TouchableOpacity style={styles.iconButton} onPress={toggleFullscreen}>
                 <Ionicons name={isFullscreen ? "contract" : "expand"} size={22} color="#FFF" />
-              </TouchableOpacity>
-            </View>
+                  </TouchableOpacity>
+              </View>
 
             {/* Center Controls */}
             <View style={styles.centerControls}>
               <TouchableOpacity style={styles.seekButton} onPress={() => handleSeek(-10)}>
                 <Ionicons name="play-back" size={22} color="#FFF" />
                 <Text style={styles.seekText}>10s</Text>
-              </TouchableOpacity>
+                    </TouchableOpacity>
 
               <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
                 <Ionicons
@@ -655,7 +711,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </View>
 
             {/* Bottom Controls */}
-            <View style={styles.bottomControls}>
+              <View style={styles.bottomControls}>
               <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
 
               <View style={styles.progressBarContainer}>
@@ -664,7 +720,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 </View>
 
                 {/* Progress Thumb */}
-                <Animated.View style={[styles.progressThumb, { left: (currentTime / duration) * 100 + '%' }]} />
+                <Animated.View style={[styles.progressThumb, { left: `${(currentTime / duration) * 100}%` }]} />
               </View>
 
               <Text style={styles.timeText}>{formatTime(duration)}</Text>
@@ -739,283 +795,297 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   <ActivityIndicator size="small" color="#000" />
                 ) : (
                   <Text style={styles.retryText}>Retry ({3 - retryCount} attempts left)</Text>
-                )}
-              </TouchableOpacity>
+        )}
+      </TouchableOpacity>
             </BlurView>
           </View>
         )}
       </View>
     </View>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000',
+    width: "100%",
+    aspectRatio: 16 / 9,
+    backgroundColor: "#000",
+    borderRadius: 16,
+    overflow: "hidden",
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
   },
-  videoContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContainer: {
-    position: 'absolute',
+  fullscreenContainer: {
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  loadingText: {
-    color: '#fff',
-    fontSize: 16,
-    marginTop: 10,
-  },
-  errorContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  errorText: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 5,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  retryButtonDisabled: {
-    backgroundColor: '#666',
-  },
-  retryCount: {
-    color: '#fff',
-    fontSize: 14,
-    marginTop: 10,
+    zIndex: 1000,
+    borderRadius: 0,
   },
   videoWrapper: {
     flex: 1,
-    backgroundColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
   },
   video: {
-    flex: 1,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#000",
   },
   tapHandler: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
   },
   gestureHandler: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
   },
   controlsOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
   },
   gradient: {
     flex: 1,
+    justifyContent: "space-between",
+    padding: 16,
   },
   topControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: Platform.OS === "ios" ? 40 : 16,
   },
   backButton: {
-    padding: 5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 224, 255, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
   title: {
-    color: '#fff',
+    color: "#FFF",
     fontSize: 16,
+    fontWeight: "600",
     flex: 1,
-    marginLeft: 10,
+    marginHorizontal: 12,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   iconButton: {
-    padding: 5,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 224, 255, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
   },
   centerControls: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
   },
   seekButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-  },
-  seekText: {
-    color: '#fff',
-    fontSize: 14,
-    marginHorizontal: 5,
-  },
-  playButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  seekText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginHorizontal: 2,
+  },
+  playButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(0, 224, 255, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 24,
+    borderWidth: 3,
+    borderColor: "#FFF",
   },
   bottomControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 16,
   },
   timeText: {
-    color: '#fff',
-    fontSize: 14,
-    marginHorizontal: 10,
+    color: "#FFF",
+    fontSize: 12,
+    marginHorizontal: 8,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   progressBarContainer: {
     flex: 1,
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 2,
-    marginHorizontal: 10,
+    height: 20,
+    justifyContent: "center",
+    marginHorizontal: 8,
   },
   progressBar: {
-    height: '100%',
-    backgroundColor: 'transparent',
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 2,
   },
   progress: {
-    height: '100%',
-    backgroundColor: '#2196F3',
+    height: "100%",
+    backgroundColor: "#00E0FF",
     borderRadius: 2,
   },
   progressThumb: {
-    position: 'absolute',
-    width: 12,
-    height: 12,
-    backgroundColor: '#2196F3',
-    borderRadius: 6,
-    top: -4,
+    position: "absolute",
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#00E0FF",
+    borderWidth: 2,
+    borderColor: "#FFF",
+    marginLeft: -7,
+    top: 3,
   },
   doubleTapIndicator: {
-    position: 'absolute',
-    top: '50%',
-    transform: [{ translateY: -25 }],
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 25,
-    padding: 10,
+    position: "absolute",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(0, 224, 255, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.5)",
   },
   leftIndicator: {
-    left: 20,
+    left: "15%",
+    top: "40%",
   },
   rightIndicator: {
-    right: 20,
+    right: "15%",
+    top: "40%",
   },
   doubleTapIconContainer: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   doubleTapText: {
-    color: '#fff',
+    color: "#FFF",
     fontSize: 12,
-    marginTop: 5,
+    fontWeight: "bold",
+    marginTop: 4,
   },
   gestureIndicators: {
-    position: 'absolute',
-    top: 0,
+    position: "absolute",
     left: 0,
     right: 0,
+    top: 0,
     bottom: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 80,
+    pointerEvents: "none",
   },
   indicatorContainer: {
-    width: 40,
-    height: 150,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 20,
-    padding: 10,
-    justifyContent: 'space-between',
+    alignItems: "center",
+    opacity: 0.7,
   },
   indicatorBar: {
-    flex: 1,
     width: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    height: 100,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
     borderRadius: 2,
-    marginTop: 10,
+    marginTop: 8,
+    overflow: "hidden",
   },
   indicatorFill: {
-    width: '100%',
-    backgroundColor: '#2196F3',
+    width: "100%",
+    backgroundColor: "#00E0FF",
     borderRadius: 2,
+    position: "absolute",
+    bottom: 0,
   },
   bufferingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
   },
   bufferingBlur: {
-    padding: 20,
-    borderRadius: 10,
+    padding: 16,
+    borderRadius: 16,
+    overflow: "hidden",
   },
   bufferingContent: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   spinner: {
-    width: 30,
-    height: 30,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 3,
-    borderColor: '#2196F3',
-    borderTopColor: 'transparent',
-    borderRadius: 15,
+    borderColor: "#00E0FF",
+    borderTopColor: "rgba(255, 255, 255, 0.5)",
+    borderRightColor: "rgba(255, 255, 255, 0.3)",
+    borderBottomColor: "rgba(255, 255, 255, 0.2)",
+    marginBottom: 8,
   },
   bufferingText: {
-    color: '#fff',
+    color: "#FFF",
     fontSize: 14,
-    marginTop: 10,
+    fontWeight: "500",
+  },
+  errorContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   errorBlur: {
     padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
+    borderRadius: 16,
+    alignItems: "center",
+    width: "80%",
   },
   errorIcon: {
     marginBottom: 10,
   },
-  retryText: {
-    color: '#fff',
+  errorText: {
+    color: "#FFF",
     fontSize: 16,
+    textAlign: "center",
+    marginBottom: 15,
   },
-  fullscreenContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 999,
+  retryButton: {
+    backgroundColor: "#00E0FF",
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 24,
   },
-});
-
-export default VideoPlayer;
+  retryText: {
+    color: "#000",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  retryButtonDisabled: {
+    opacity: 0.7,
+  },
+})
