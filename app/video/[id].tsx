@@ -94,6 +94,21 @@ export default function VideoScreen() {
 
   const handleVideoProgress = (progress: number) => {
     setProgress(progress)
+    // Update watch history with current progress
+    if (video) {
+      const currentTime = Math.floor(progress * parseInt(video.duration))
+      addToWatchHistory({
+        id: video.id,
+        title: video.title,
+        channelTitle: video.channelName,
+        viewCount: video.views,
+        duration: video.duration,
+        thumbnail: video.thumbnail,
+        description: video.description,
+        publishedAt: video.publishedAt,
+        channelId: video.channelId
+      }, `${currentTime}`)
+    }
   }
 
   const handleVideoComplete = () => {
@@ -109,6 +124,7 @@ export default function VideoScreen() {
         publishedAt: video.publishedAt,
         channelId: video.channelId
       }, video.duration)
+      setProgress(1)
     }
   }
 
@@ -137,6 +153,9 @@ export default function VideoScreen() {
               videoUrl={video.videoUrl}
               thumbnailUrl={video.thumbnail}
               title={video.title}
+              channelName={video.channelName}
+              autoPlay={true}
+              showControls={true}
               onProgress={handleVideoProgress}
               onComplete={handleVideoComplete}
             />

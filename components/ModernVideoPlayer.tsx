@@ -1,10 +1,11 @@
-import React, { useState } from "react"
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform } from "react-native"
+import React, { useState, useRef, useEffect } from "react"
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform, Animated, PanResponder } from "react-native"
 import { WebView } from 'react-native-webview'
 import { FontAwesome5 } from "@expo/vector-icons"
 import * as ScreenOrientation from "expo-screen-orientation"
 import { StatusBar } from "expo-status-bar"
 import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
 
 interface VideoPlayerProps {
   videoUrl: string
@@ -31,41 +32,81 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showControlsOverlay, setShowControlsOverlay] = useState(true)
+  const [isPlaying, setIsPlaying] = useState(autoPlay)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [volume, setVolume] = useState(1)
+  const [isMuted, setIsMuted] = useState(false)
+  const [brightness, setBrightness] = useState(1)
+  const [isBuffering, setIsBuffering] = useState(false)
 
+  const controlsTimeout = useRef<NodeJS.Timeout>()
+  const fadeAnim = useRef(new Animated.Value(1)).current
   const { width, height } = Dimensions.get('window')
 
-  // Check if the URL is a YouTube embed URL
-  const isYouTubeEmbed = videoUrl?.includes('youtube.com') || videoUrl?.includes('youtu.be')
-  console.log('Video URL analysis:', {
-    originalUrl: videoUrl,
-    isYouTubeEmbed,
-    urlType: typeof videoUrl,
-    isEmpty: videoUrl === "",
-    isNullOrUndefined: videoUrl == null
-  })
+  // Gesture controls
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        setShowControlsOverlay(true)
+        fadeInControls()
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Handle volume and brightness gestures
+        if (gestureState.moveX < width / 3) {
+          // Left side: brightness control
+          const newBrightness = Math.max(0, Math.min(1, brightness + gestureState.dy / 200))
+          setBrightness(newBrightness)
+        } else if (gestureState.moveX > (width * 2) / 3) {
+          // Right side: volume control
+          const newVolume = Math.max(0, Math.min(1, volume + gestureState.dy / 200))
+          setVolume(newVolume)
+        }
+      },
+      onPanResponderRelease: () => {
+        fadeOutControls()
+      },
+    })
+  ).current
 
-  // Ensure the URL is in the correct embedded format for YouTube
-  const getEmbeddedUrl = (url: string | undefined): string => {
-    if (!url || url.trim() === "") return '';
-    
-    try {
-      // Extract video ID from various YouTube URL formats
-      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-      const match = url.match(regExp);
-      
-      if (match && match[2].length === 11) {
-        return `https://www.youtube.com/embed/${match[2]}?autoplay=1&modestbranding=1&rel=0&enablejsapi=1&playsinline=1`
-      }
-      
-      return url;
-    } catch (e) {
-      console.error('Error processing video URL:', e)
-      return url;
+  const fadeInControls = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start()
+  }
+
+  const fadeOutControls = () => {
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current)
     }
-  };
+    controlsTimeout.current = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start()
+    }, 3000)
+  }
 
-  const embeddedUrl = getEmbeddedUrl(videoUrl)
-  console.log('Final embedded URL:', embeddedUrl)
+  useEffect(() => {
+    fadeOutControls()
+    return () => {
+      if (controlsTimeout.current) {
+        clearTimeout(controlsTimeout.current)
+      }
+    }
+  }, [])
+
+  const togglePlayPause = () => {
+    setIsPlaying(!isPlaying)
+    setShowControlsOverlay(true)
+    fadeInControls()
+  }
 
   const toggleFullscreen = async () => {
     if (isFullscreen) {
@@ -76,41 +117,120 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsFullscreen(!isFullscreen)
   }
 
-  const isValidUrl = (url: string | undefined): boolean => {
-    if (!url) return false
-    const trimmedUrl = url.trim()
-    return trimmedUrl !== "" && (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://'))
+  const toggleMute = () => {
+    setIsMuted(!isMuted)
+    setShowControlsOverlay(true)
+    fadeInControls()
+  }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`
+  }
+
+  // Handle video progress
+  const handleProgress = (event: any) => {
+    if (event.nativeEvent.progress) {
+      const progress = event.nativeEvent.progress
+      setCurrentTime(progress * duration)
+      onProgress?.(progress)
+    }
+  }
+
+  // Handle video loaded
+  const handleLoaded = (event: any) => {
+    if (event.nativeEvent.duration) {
+      setDuration(event.nativeEvent.duration)
+    }
+  }
+
+  // Handle video ended
+  const handleEnded = () => {
+    setIsPlaying(false)
+    onComplete?.()
   }
 
   return (
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
       <StatusBar hidden={isFullscreen} />
-      <View style={styles.videoWrapper}>
-        {isValidUrl(videoUrl) ? (
-          <WebView
-            source={{ uri: embeddedUrl }}
-            style={styles.video}
-            allowsFullscreenVideo={true}
-            allowsInlineMediaPlayback={true}
-            mediaPlaybackRequiresUserAction={false}
-            onError={(syntheticEvent) => {
-              const { nativeEvent } = syntheticEvent;
-              setError(`WebView error: ${nativeEvent.description}`);
-            }}
-          />
-        ) : (
-          <View style={styles.errorContainer}>
-            <BlurView intensity={70} style={styles.errorBlur}>
-              <FontAwesome5 name="exclamation-triangle" size={30} color="#FF6B6B" style={styles.errorIcon} />
-              <Text style={styles.errorText}>
-                {!videoUrl ? "No video source available" : 
-                 videoUrl.trim() === "" ? "Video URL is empty" : 
-                 "Invalid video URL"}
-              </Text>
-            </BlurView>
-          </View>
-        )}
+      <View style={styles.videoWrapper} {...panResponder.panHandlers}>
+        <WebView
+          source={{ uri: videoUrl }}
+          style={styles.video}
+          allowsFullscreenVideo={true}
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            setError(`WebView error: ${nativeEvent.description}`);
+          }}
+          onLoad={handleLoaded}
+          onProgress={handleProgress}
+          onEnded={handleEnded}
+        />
 
+        {/* Floating Controls Overlay */}
+        <Animated.View style={[styles.controlsOverlay, { opacity: fadeAnim }]}>
+          <LinearGradient
+            colors={['rgba(0,0,0,0.7)', 'transparent', 'transparent', 'rgba(0,0,0,0.7)']}
+            style={styles.gradient}
+          >
+            {/* Top Controls */}
+            <View style={styles.topControls}>
+              <TouchableOpacity onPress={() => setIsFullscreen(false)}>
+                <FontAwesome5 name="chevron-down" size={20} color="#FFF" />
+              </TouchableOpacity>
+              <Text style={styles.title} numberOfLines={1}>{title}</Text>
+              <TouchableOpacity onPress={toggleFullscreen}>
+                <FontAwesome5 name="expand" size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Center Controls */}
+            <View style={styles.centerControls}>
+              <TouchableOpacity onPress={() => {/* Seek backward */}}>
+                <FontAwesome5 name="step-backward" size={24} color="#FFF" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+                <FontAwesome5 name={isPlaying ? "pause" : "play"} size={32} color="#FFF" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => {/* Seek forward */}}>
+                <FontAwesome5 name="step-forward" size={24} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Bottom Controls */}
+            <View style={styles.bottomControls}>
+              <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progress, { width: `${(currentTime / duration) * 100}%` }]} />
+              </View>
+              <Text style={styles.timeText}>{formatTime(duration)}</Text>
+              <TouchableOpacity onPress={toggleMute}>
+                <FontAwesome5 name={isMuted ? "volume-mute" : "volume-up"} size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Gesture Indicators */}
+        <View style={styles.gestureIndicators}>
+          <View style={styles.brightnessIndicator}>
+            <FontAwesome5 name="sun" size={20} color="#FFF" />
+            <View style={styles.indicatorBar}>
+              <View style={[styles.indicatorFill, { height: `${brightness * 100}%` }]} />
+            </View>
+          </View>
+          <View style={styles.volumeIndicator}>
+            <FontAwesome5 name="volume-up" size={20} color="#FFF" />
+            <View style={styles.indicatorBar}>
+              <View style={[styles.indicatorFill, { height: `${volume * 100}%` }]} />
+            </View>
+          </View>
+        </View>
+
+        {/* Error State */}
         {error && (
           <View style={styles.errorContainer}>
             <BlurView intensity={70} style={styles.errorBlur}>
@@ -167,6 +287,93 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  controlsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
+  },
+  gradient: {
+    flex: 1,
+    justifyContent: "space-between",
+    padding: 16,
+  },
+  topControls: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: Platform.OS === "ios" ? 40 : 16,
+  },
+  title: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "600",
+    flex: 1,
+    marginHorizontal: 16,
+  },
+  centerControls: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  playButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 32,
+  },
+  bottomControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 16,
+  },
+  timeText: {
+    color: "#FFF",
+    fontSize: 14,
+    marginHorizontal: 8,
+  },
+  progressBar: {
+    flex: 1,
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 2,
+    marginHorizontal: 8,
+  },
+  progress: {
+    height: "100%",
+    backgroundColor: "#FF6B6B",
+    borderRadius: 2,
+  },
+  gestureIndicators: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    pointerEvents: "none",
+  },
+  brightnessIndicator: {
+    alignItems: "center",
+  },
+  volumeIndicator: {
+    alignItems: "center",
+  },
+  indicatorBar: {
+    width: 4,
+    height: 100,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 2,
+    marginTop: 8,
+  },
+  indicatorFill: {
+    width: "100%",
+    backgroundColor: "#FF6B6B",
+    borderRadius: 2,
+  },
   errorContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
@@ -198,4 +405,4 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "bold",
   },
-});
+})
