@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Animated, Dimensions } from "react-native"
+import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Animated, Dimensions, StatusBar, Platform } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
@@ -8,6 +8,7 @@ import VideoPlayer from "../../components/ModernVideoPlayer"
 import { FontAwesome5 } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import { BlurView } from "expo-blur"
+import * as ScreenOrientation from 'expo-screen-orientation'
 
 export default function VideoScreen() {
   const params = useLocalSearchParams()
@@ -16,18 +17,40 @@ export default function VideoScreen() {
   const [relatedVideos, setRelatedVideos] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('info')
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const scrollY = useRef(new Animated.Value(0)).current
-  const { width } = Dimensions.get('window')
+  const { width, height } = Dimensions.get('window')
 
   useEffect(() => {
     loadVideoData()
-  }, [params.id])
+    
+    // Set initial orientation to portrait
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT)
+    
+    // Listen for orientation changes
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      const isPortraitMode = window.width < window.height
+      if (!isPortraitMode && !isFullscreen) {
+        // If device is in landscape but not in fullscreen mode, update state
+        setIsFullscreen(true)
+      } else if (isPortraitMode && isFullscreen) {
+        // If device is in portrait but in fullscreen mode, update state
+        setIsFullscreen(false)
+      }
+    })
+    
+    return () => {
+      subscription.remove()
+      // Reset orientation to portrait when component unmounts
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT)
+    }
+  }, [isFullscreen])
 
   const loadVideoData = async () => {
     try {
       const allVideos = await getAggregatedContent()
       const videoData = allVideos.find(v => v.id === params.id)
-      
+
       if (videoData) {
         // Format video URL for YouTube embeds
         let videoUrl = videoData.videoUrl
@@ -59,6 +82,8 @@ export default function VideoScreen() {
   })
 
   const renderHeader = () => {
+    if (isFullscreen) return null
+    
     return (
       <Animated.View style={[
         styles.header,
@@ -85,6 +110,8 @@ export default function VideoScreen() {
   }
 
   const renderTabs = () => {
+    if (isFullscreen) return null
+    
     return (
       <View style={styles.tabsContainer}>
         <TouchableOpacity 
@@ -113,6 +140,8 @@ export default function VideoScreen() {
   }
 
   const renderInfoContent = () => {
+    if (isFullscreen) return null
+    
     return (
       <View style={styles.infoContainer}>
         <View style={styles.titleRow}>
@@ -182,6 +211,8 @@ export default function VideoScreen() {
   }
 
   const renderRelatedContent = () => {
+    if (isFullscreen) return null
+    
     return (
       <View style={styles.relatedContainer}>
         <Text style={styles.sectionTitle}>Related Videos</Text>
@@ -198,6 +229,8 @@ export default function VideoScreen() {
   }
 
   const renderCommentsContent = () => {
+    if (isFullscreen) return null
+    
     return (
       <View style={styles.commentsContainer}>
         <View style={styles.commentInputContainer}>
@@ -268,6 +301,11 @@ export default function VideoScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar 
+        barStyle={isFullscreen ? "light-content" : "dark-content"} 
+        backgroundColor={isFullscreen ? "#000" : "#001E3C"}
+        hidden={isFullscreen}
+      />
       {renderHeader()}
       <Animated.ScrollView 
         showsVerticalScrollIndicator={false}
@@ -276,6 +314,7 @@ export default function VideoScreen() {
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
+        scrollEnabled={!isFullscreen}
       >
         <VideoPlayer
           videoUrl={video.videoUrl}
