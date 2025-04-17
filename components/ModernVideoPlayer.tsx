@@ -154,9 +154,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             modestbranding: true,
             rel: false,
             controls: false,
-            showinfo: 0,
-            iv_load_policy: 3,
-            fs: 0
+            playsinline: true,
+            origin: 'https://www.youtube.com'
           }}
           webViewProps={{
             allowsInlineMediaPlayback: true,
