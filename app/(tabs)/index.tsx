@@ -17,8 +17,9 @@ import {
   getAggregatedContent,
   getTrendingContent,
   getRecommendedContent,
-  type AggregatedVideo,
+
 } from "../../services/content-aggregator"
+import { AggregatedVideo } from "../../types/videoag"
 
 const CATEGORIES = ["All", "Programming", "Mathematics", "Science", "History", "Languages", "Arts", "Business"]
 
@@ -113,7 +114,6 @@ export default function HomeScreen() {
         instructor: video.instructor,
         institution: video.institution,
         rating: video.rating,
-        price: video.price
       },
     })
   }, [router])
