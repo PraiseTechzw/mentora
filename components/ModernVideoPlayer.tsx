@@ -461,11 +461,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             height: 100%;
             background-color: #000;
             overflow: hidden;
+            position: relative;
+          }
+          .video-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
           }
           iframe {
             width: 100%;
             height: 100%;
             border: none;
+            position: absolute;
+            top: 0;
+            left: 0;
           }
           .loading {
             position: absolute;
@@ -475,6 +489,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             color: white;
             font-family: Arial, sans-serif;
             text-align: center;
+            z-index: 10;
           }
           .loading-spinner {
             width: 40px;
@@ -495,39 +510,118 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <div class="loading-spinner"></div>
           <div>Loading video...</div>
         </div>
-        <iframe 
-          id="videoPlayer"
-          src="${videoUrl}"
-          frameborder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen
-          onload="handleIframeLoad()"
-        ></iframe>
+        <div class="video-container">
+          <iframe 
+            id="videoPlayer"
+            src="${videoUrl}"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+            onload="handleIframeLoad()"
+          ></iframe>
+        </div>
         <script>
           let player;
           let duration = 0;
+          let isPlayerReady = false;
+          let retryCount = 0;
+          const MAX_RETRIES = 3;
           
           function handleIframeLoad() {
+            console.log('Iframe loaded');
             const iframe = document.getElementById('videoPlayer');
             player = iframe.contentWindow;
             
             // Listen for YouTube player events
             window.addEventListener('message', function(event) {
-              if (event.origin === 'https://www.youtube.com') {
+              try {
+                console.log('Message received:', event.data);
                 const data = JSON.parse(event.data);
-                if (data.info) {
+                
+                if (data.event === 'onReady') {
+                  console.log('Player ready');
+                  isPlayerReady = true;
+                  requestVideoInfo();
+                } else if (data.info) {
+                  console.log('Video info received:', data.info);
                   duration = data.info.duration;
                   window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'loaded',
                     duration: duration
                   }));
                   document.getElementById('loading').style.display = 'none';
+                } else if (data.event === 'onStateChange') {
+                  console.log('State change:', data.info);
+                  // Handle player state changes
+                  if (data.info === 1) { // Playing
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'playing'
+                    }));
+                  } else if (data.info === 2) { // Paused
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'paused'
+                    }));
+                  } else if (data.info === 3) { // Buffering
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'buffering_start'
+                    }));
+                  } else if (data.info === 5) { // Video cued
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'buffering_end'
+                    }));
+                  } else if (data.info === 0) { // Ended
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'ended'
+                    }));
+                  }
                 }
+              } catch (e) {
+                console.error('Error parsing message:', e);
               }
             });
             
             // Send ready event to YouTube player
             player.postMessage('{"event":"listening","id":"videoPlayer","channel":"widget"}', '*');
+            
+            // Check if video is visible after a delay
+            setTimeout(checkVideoVisibility, 2000);
+          }
+          
+          function checkVideoVisibility() {
+            console.log('Checking video visibility');
+            // Try to get video element
+            const videoElement = document.querySelector('video');
+            if (videoElement) {
+              console.log('Video element found');
+              // Check if video has dimensions
+              if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+                console.log('Video dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+                document.getElementById('loading').style.display = 'none';
+              } else {
+                console.log('Video has no dimensions, retrying...');
+                retryVideoLoad();
+              }
+            } else {
+              console.log('No video element found, retrying...');
+              retryVideoLoad();
+            }
+          }
+          
+          function retryVideoLoad() {
+            if (retryCount < MAX_RETRIES) {
+              retryCount++;
+              console.log('Retry attempt', retryCount);
+              // Reload the iframe
+              const iframe = document.getElementById('videoPlayer');
+              iframe.src = iframe.src;
+              setTimeout(checkVideoVisibility, 2000);
+            } else {
+              console.log('Max retries reached');
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'error',
+                message: 'Failed to load video after multiple attempts'
+              }));
+            }
           }
           
           // Request video info periodically until we get the duration
