@@ -81,52 +81,10 @@ export default function VideoScreen() {
     try {
       console.log('Loading video data for ID:', params.id);
       const allVideos = await getAggregatedContent()
+      
+      // Validate that the video exists
       const videoData = allVideos.find((v) => v.id === params.id)
-
-      if (videoData) {
-        // Ensure videoUrl is properly formatted
-        let videoUrl = videoData.videoUrl;
-        if (videoData.source === 'embedded') {
-          // Convert YouTube URLs to embed format if needed
-          if (!videoUrl.includes('embed')) {
-            const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
-            videoUrl = `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&autoplay=1&playsinline=1`;
-          }
-        }
-
-        console.log('Video data loaded:', {
-          id: videoData.id,
-          title: videoData.title,
-          source: videoData.source,
-          videoUrl: videoUrl,
-          originalUrl: videoData.videoUrl
-        });
-
-        // Update video data with formatted URL
-        const updatedVideoData = {
-          ...videoData,
-          videoUrl: videoUrl
-        };
-        
-        setVideo(updatedVideoData)
-        addToWatchHistory(
-          {
-            id: updatedVideoData.id,
-            title: updatedVideoData.title,
-            channelTitle: updatedVideoData.channelName,
-            viewCount: updatedVideoData.views,
-            duration: updatedVideoData.duration,
-            thumbnail: updatedVideoData.thumbnail,
-            description: updatedVideoData.description,
-            publishedAt: updatedVideoData.publishedAt,
-            channelId: updatedVideoData.channelId,
-          },
-          "0:00",
-        )
-
-        const related = allVideos.filter((v) => v.id !== params.id).slice(0, 5)
-        setRelatedVideos(related)
-      } else {
+      if (!videoData) {
         console.error('Video not found:', {
           id: params.id,
           availableVideos: allVideos.map(v => v.id)
@@ -140,8 +98,52 @@ export default function VideoScreen() {
         if (randomVideo) {
           console.log('Loading fallback video:', randomVideo.id);
           router.replace(`/video/${randomVideo.id}`);
+          return; // Exit early since we're redirecting
         }
       }
+
+      // Ensure videoUrl is properly formatted
+      let videoUrl = videoData.videoUrl;
+      if (videoData.source === 'embedded') {
+        // Convert YouTube URLs to embed format if needed
+        if (!videoUrl.includes('embed')) {
+          const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
+          videoUrl = `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&autoplay=1&playsinline=1`;
+        }
+      }
+
+      console.log('Video data loaded:', {
+        id: videoData.id,
+        title: videoData.title,
+        source: videoData.source,
+        videoUrl: videoUrl,
+        originalUrl: videoData.videoUrl
+      });
+
+      // Update video data with formatted URL
+      const updatedVideoData = {
+        ...videoData,
+        videoUrl: videoUrl
+      };
+      
+      setVideo(updatedVideoData)
+      addToWatchHistory(
+        {
+          id: updatedVideoData.id,
+          title: updatedVideoData.title,
+          channelTitle: updatedVideoData.channelName,
+          viewCount: updatedVideoData.views,
+          duration: updatedVideoData.duration,
+          thumbnail: updatedVideoData.thumbnail,
+          description: updatedVideoData.description,
+          publishedAt: updatedVideoData.publishedAt,
+          channelId: updatedVideoData.channelId,
+        },
+        "0:00",
+      )
+
+      const related = allVideos.filter((v) => v.id !== params.id).slice(0, 5)
+      setRelatedVideos(related)
     } catch (error) {
       console.error("Error loading video data:", error)
       setError('Failed to load video. Please try again.');

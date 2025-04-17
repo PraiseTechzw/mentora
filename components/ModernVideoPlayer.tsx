@@ -462,81 +462,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             background-color: #000;
             overflow: hidden;
           }
-          video {
+          iframe {
             width: 100%;
             height: 100%;
-            object-fit: contain;
-          }
-          .error-message {
-            color: white;
-            text-align: center;
-            padding: 20px;
-            font-family: Arial, sans-serif;
+            border: none;
           }
         </style>
       </head>
       <body>
-        <video 
-          id="videoPlayer" 
-          src="${videoUrl}" 
-          ${autoPlay ? "autoplay" : ""} 
-          ${isMuted ? "muted" : ""} 
-          playsinline
-          webkit-playsinline
-          onerror="handleVideoError(event)"
-        ></video>
-        <script>
-          const video = document.getElementById('videoPlayer');
-          
-          function handleVideoError(event) {
-            console.error('Video error:', event.target.error);
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'error',
-              message: 'Video playback failed: ' + (event.target.error?.message || 'Unknown error')
-            }));
-          }
-          
-          // Send events to React Native
-          video.addEventListener('loadedmetadata', function() {
-            console.log('Video metadata loaded:', video.duration);
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'loaded',
-              duration: video.duration
-            }));
-          });
-          
-          video.addEventListener('timeupdate', function() {
-            const progress = video.currentTime / video.duration;
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'progress',
-              progress: progress
-            }));
-          });
-          
-          video.addEventListener('ended', function() {
-            console.log('Video ended');
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'ended'
-            }));
-          });
-          
-          video.addEventListener('waiting', function() {
-            console.log('Video buffering started');
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'buffering_start'
-            }));
-          });
-          
-          video.addEventListener('playing', function() {
-            console.log('Video buffering ended');
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'buffering_end'
-            }));
-          });
-          
-          // Initial play for autoplay
-          ${autoPlay ? "video.play().catch(e => handleVideoError(e));" : ""}
-        </script>
+        <iframe 
+          id="videoPlayer"
+          src="${videoUrl}"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        ></iframe>
       </body>
     </html>
   `
