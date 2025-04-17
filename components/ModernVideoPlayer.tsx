@@ -153,7 +153,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           initialPlayerParams={{
             modestbranding: true,
             rel: false,
-            controls: false
+            controls: false,
+            showinfo: 0,
+            iv_load_policy: 3,
+            fs: 0
           }}
           webViewProps={{
             allowsInlineMediaPlayback: true,
