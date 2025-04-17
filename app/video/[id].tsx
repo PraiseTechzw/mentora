@@ -85,7 +85,7 @@ export default function VideoScreen() {
       if (videoData) {
         // Ensure videoUrl is properly formatted
         let videoUrl = videoData.videoUrl;
-        if (videoData.source === 'youtube') {
+        if (videoData.source === 'embedded') {
           // Convert YouTube URLs to embed format if needed
           if (!videoUrl.includes('embed')) {
             const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
