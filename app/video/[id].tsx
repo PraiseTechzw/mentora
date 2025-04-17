@@ -59,6 +59,7 @@ export default function VideoScreen() {
   const [activeTab, setActiveTab] = useState<"related" | "comments">("related")
   const [newComment, setNewComment] = useState("")
   const [isCommenting, setIsCommenting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Animated values
   const headerOpacity = useSharedValue(0)
@@ -130,9 +131,20 @@ export default function VideoScreen() {
           id: params.id,
           availableVideos: allVideos.map(v => v.id)
         });
+        
+        // Show error message to user
+        setError('Video not found. Please try another video.');
+        
+        // Load a random video as fallback
+        const randomVideo = allVideos[Math.floor(Math.random() * allVideos.length)];
+        if (randomVideo) {
+          console.log('Loading fallback video:', randomVideo.id);
+          router.replace(`/video/${randomVideo.id}`);
+        }
       }
     } catch (error) {
       console.error("Error loading video data:", error)
+      setError('Failed to load video. Please try again.');
     } finally {
       setIsLoading(false)
     }

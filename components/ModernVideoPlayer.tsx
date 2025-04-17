@@ -392,9 +392,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       message,
       title,
       videoUrl,
-      currentTime
+      currentTime,
+      retryCount
     });
-    setError(message)
+    
+    // More descriptive error messages
+    let errorMessage = message;
+    if (message.includes('Failed to load')) {
+      errorMessage = 'Video failed to load. Please check your internet connection.';
+    } else if (message.includes('not found')) {
+      errorMessage = 'Video not found. Please try another video.';
+    } else if (message.includes('format')) {
+      errorMessage = 'Video format not supported. Please try another video.';
+    }
+    
+    setError(errorMessage)
     setIsBuffering(false)
     bufferingOpacity.value = withTiming(0)
   }
