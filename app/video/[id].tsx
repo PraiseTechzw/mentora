@@ -10,6 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Pressable,
+  TextInput,
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from "expo-router"
@@ -34,45 +35,30 @@ import type { AggregatedVideo } from "../../types/videoag"
 import { getAggregatedContent } from "../../services/content-aggregator"
 import { VideoPlayer } from "../../components/ModernVideoPlayer"
 
+interface Comment {
+  id: string
+  author: string
+  avatar: string
+  text: string
+  time: string
+  likes: number
+}
+
 export default function VideoScreen() {
   const params = useLocalSearchParams()
   const router = useRouter()
   const [video, setVideo] = useState<AggregatedVideo | null>(null)
   const [relatedVideos, setRelatedVideos] = useState<AggregatedVideo[]>([])
-  const [comments, setComments] = useState([
-    {
-      id: "1",
-      author: "Alex Johnson",
-      avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-      text: "This video is absolutely amazing! I learned so much from it.",
-      time: "2 days ago",
-      likes: 24,
-    },
-    {
-      id: "2",
-      author: "Sarah Williams",
-      avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-      text: "Great explanation! Could you make a follow-up video on this topic?",
-      time: "1 week ago",
-      likes: 56,
-    },
-    {
-      id: "3",
-      author: "Michael Chen",
-      avatar: "https://randomuser.me/api/portraits/men/67.jpg",
-      text: "I've been looking for content like this for ages. Thanks for sharing!",
-      time: "3 days ago",
-      likes: 18,
-    },
-  ])
+  const [comments, setComments] = useState<Comment[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [showComments, setShowComments] = useState(false)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [likeStatus, setLikeStatus] = useState<"none" | "liked" | "disliked">("none")
   const [progress, setProgress] = useState(0)
   const [isScrolling, setIsScrolling] = useState(false)
   const [activeTab, setActiveTab] = useState<"related" | "comments">("related")
+  const [newComment, setNewComment] = useState("")
+  const [isCommenting, setIsCommenting] = useState(false)
 
   // Animated values
   const headerOpacity = useSharedValue(0)
@@ -209,6 +195,32 @@ export default function VideoScreen() {
 
     // Haptic feedback
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+  }
+
+  const loadComments = async () => {
+    try {
+      // TODO: Implement actual comment fetching from your backend
+      // const fetchedComments = await fetchComments(video?.id);
+      // setComments(fetchedComments);
+    } catch (error) {
+      console.error("Error loading comments:", error)
+    }
+  }
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !video) return
+
+    setIsCommenting(true)
+    try {
+      // TODO: Implement actual comment posting to your backend
+      // const comment = await postComment(video.id, newComment);
+      // setComments(prev => [comment, ...prev]);
+      setNewComment("")
+    } catch (error) {
+      console.error("Error posting comment:", error)
+    } finally {
+      setIsCommenting(false)
+    }
   }
 
   // Animated styles
@@ -404,35 +416,58 @@ export default function VideoScreen() {
                       contentFit="cover"
                     />
                     <View style={styles.commentInput}>
-                      <Text style={styles.commentInputPlaceholder}>Add a comment...</Text>
+                      <TextInput
+                        style={styles.commentInputText}
+                        placeholder="Add a comment..."
+                        placeholderTextColor="rgba(255, 255, 255, 0.5)"
+                        value={newComment}
+                        onChangeText={setNewComment}
+                        multiline
+                      />
+                      <TouchableOpacity 
+                        style={[styles.postButton, !newComment.trim() && styles.postButtonDisabled]}
+                        onPress={handleAddComment}
+                        disabled={!newComment.trim() || isCommenting}
+                      >
+                        <Text style={styles.postButtonText}>
+                          {isCommenting ? "Posting..." : "Post"}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
                   <View style={styles.commentsList}>
-                    {comments.map((comment) => (
-                      <View key={comment.id} style={styles.commentItem}>
-                        <Image source={comment.avatar} style={styles.commentAvatar} contentFit="cover" />
-                        <View style={styles.commentContent}>
-                          <View style={styles.commentHeader}>
-                            <Text style={styles.commentAuthor}>{comment.author}</Text>
-                            <Text style={styles.commentTime}>{comment.time}</Text>
-                          </View>
-                          <Text style={styles.commentText}>{comment.text}</Text>
-                          <View style={styles.commentActions}>
-                            <TouchableOpacity style={styles.commentAction}>
-                              <Ionicons name="thumbs-up-outline" size={16} color="#AAA" />
-                              <Text style={styles.commentActionText}>{comment.likes}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.commentAction}>
-                              <Ionicons name="thumbs-down-outline" size={16} color="#AAA" />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.commentAction}>
-                              <Text style={styles.commentActionText}>Reply</Text>
-                            </TouchableOpacity>
+                    {comments.length === 0 ? (
+                      <View style={styles.noCommentsContainer}>
+                        <Text style={styles.noCommentsText}>No comments yet</Text>
+                        <Text style={styles.noCommentsSubtext}>Be the first to comment!</Text>
+                      </View>
+                    ) : (
+                      comments.map((comment) => (
+                        <View key={comment.id} style={styles.commentItem}>
+                          <Image source={comment.avatar} style={styles.commentAvatar} contentFit="cover" />
+                          <View style={styles.commentContent}>
+                            <View style={styles.commentHeader}>
+                              <Text style={styles.commentAuthor}>{comment.author}</Text>
+                              <Text style={styles.commentTime}>{comment.time}</Text>
+                            </View>
+                            <Text style={styles.commentText}>{comment.text}</Text>
+                            <View style={styles.commentActions}>
+                              <TouchableOpacity style={styles.commentAction}>
+                                <Ionicons name="thumbs-up-outline" size={16} color="#AAA" />
+                                <Text style={styles.commentActionText}>{comment.likes}</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity style={styles.commentAction}>
+                                <Ionicons name="thumbs-down-outline" size={16} color="#AAA" />
+                              </TouchableOpacity>
+                              <TouchableOpacity style={styles.commentAction}>
+                                <Text style={styles.commentActionText}>Reply</Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    ))}
+                      ))
+                    )}
                   </View>
                 </View>
               )}
@@ -689,12 +724,28 @@ const styles = StyleSheet.create({
   commentInput: {
     flex: 1,
     marginLeft: 12,
-    height: 40,
-    justifyContent: "center",
   },
-  commentInputPlaceholder: {
-    color: "rgba(255, 255, 255, 0.5)",
+  commentInputText: {
+    color: "#FFF",
     fontSize: 14,
+    minHeight: 40,
+    maxHeight: 100,
+  },
+  postButton: {
+    backgroundColor: "#00E0FF",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    marginTop: 8,
+    alignSelf: "flex-end",
+  },
+  postButtonDisabled: {
+    backgroundColor: "rgba(0, 224, 255, 0.3)",
+  },
+  postButtonText: {
+    color: "#001E3C",
+    fontSize: 12,
+    fontWeight: "500",
   },
   commentsList: {
     backgroundColor: "rgba(0, 224, 255, 0.05)",
@@ -790,5 +841,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 8,
+  },
+  noCommentsContainer: {
+    alignItems: "center",
+    padding: 24,
+  },
+  noCommentsText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  noCommentsSubtext: {
+    color: "rgba(255, 255, 255, 0.5)",
+    fontSize: 14,
   },
 })
