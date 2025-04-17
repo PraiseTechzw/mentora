@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { View, StyleSheet, Dimensions, ActivityIndicator, Text, TouchableOpacity } from "react-native"
+import { View, StyleSheet, Dimensions, ActivityIndicator, Text, TouchableOpacity, ViewStyle, TextStyle } from "react-native"
 import YoutubeIframe from "react-native-youtube-iframe"
 import { Ionicons } from "@expo/vector-icons"
 
@@ -11,7 +11,7 @@ interface VideoPlayerProps {
   thumbnailUrl?: string
   title?: string
   channelName?: string
-  style?: any
+  style?: ViewStyle
   autoPlay?: boolean
   showControlsInitially?: boolean
   onProgress?: (progress: number) => void
@@ -110,55 +110,53 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   if (error) {
     return (
-      <View style={[styles.container, style]}>
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={40} color="#FF6B6B" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => {
-              setError(null)
-              setIsLoading(true)
-              // Re-attempt to process the URL
-              if (videoUrl) {
-                try {
-                  let id = ""
-                  if (videoUrl.includes("youtube.com/embed/")) {
-                    id = videoUrl.split("youtube.com/embed/")[1].split("?")[0]
-                  } else if (videoUrl.includes("youtube.com/watch?v=")) {
-                    id = videoUrl.split("v=")[1].split("&")[0]
-                  } else if (videoUrl.includes("youtu.be/")) {
-                    id = videoUrl.split("youtu.be/")[1].split("?")[0]
-                  }
-
-                  if (id) {
-                    setVideoId(id)
-                  } else {
-                    setError("Could not extract video ID from URL")
-                  }
-                } catch (e) {
-                  setError("Invalid video URL format")
+      <View style={[styles.errorContainer, style]}>
+        <Ionicons name="alert-circle-outline" size={40} color="#FF6B6B" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => {
+            setError(null)
+            setIsLoading(true)
+            // Re-attempt to process the URL
+            if (videoUrl) {
+              try {
+                let id = ""
+                if (videoUrl.includes("youtube.com/embed/")) {
+                  id = videoUrl.split("youtube.com/embed/")[1].split("?")[0]
+                } else if (videoUrl.includes("youtube.com/watch?v=")) {
+                  id = videoUrl.split("v=")[1].split("&")[0]
+                } else if (videoUrl.includes("youtu.be/")) {
+                  id = videoUrl.split("youtu.be/")[1].split("?")[0]
                 }
+
+                if (id) {
+                  setVideoId(id)
+                } else {
+                  setError("Could not extract video ID from URL")
+                }
+              } catch (e) {
+                setError("Invalid video URL format")
               }
-            }}
-          >
-            <Text style={styles.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+            }
+          }}
+        >
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     )
   }
 
   if (!videoId) {
     return (
-      <View style={[styles.container, style]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#00E0FF" />
-          <Text style={styles.loadingText}>Loading video...</Text>
-        </View>
+      <View style={[styles.loadingContainer, style]}>
+        <ActivityIndicator size="large" color="#00E0FF" />
+        <Text style={styles.loadingText}>Loading video...</Text>
       </View>
     )
   }
+
+  const screenWidth: number = Dimensions.get("window").width;
 
   return (
     <View style={[styles.container, style]}>
@@ -175,7 +173,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <YoutubeIframe
           ref={playerRef}
           height={220}
-          width={Dimensions.get("window").width - (style?.padding || 0) * 2}
+          width={+(Dimensions.get("window").width)}
           videoId={videoId}
           play={playing}
           onChangeState={onStateChange}
@@ -193,22 +191,29 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           initialPlayerParams={{
             modestbranding: true,
             rel: false,
-            controls: showControlsInitially
+            controls: false
           }}
           webViewProps={{
             allowsInlineMediaPlayback: true,
-            mediaPlaybackRequiresUserAction: !autoPlay,
+            mediaPlaybackRequiresUserAction: false,
             javaScriptEnabled: true,
             domStorageEnabled: true,
             startInLoadingState: true,
-            renderLoading: () => (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color="#00E0FF" />
-              </View>
-            ),
+            onShouldStartLoadWithRequest: () => true,
+            onLoadEnd: () => {
+              console.log("WebView loaded")
+              setIsLoading(false)
+            },
+            androidLayerType: 'hardware',
+            mixedContentMode: 'always',
+            allowFileAccess: true,
+            allowUniversalAccessFromFileURLs: true,
+            style: {
+              backgroundColor: 'transparent',
+              opacity: 1
+            } as ViewStyle
           }}
         />
-
         {isLoading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#00E0FF" />
@@ -216,7 +221,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         )}
       </View>
 
-      {/* Custom controls could be added here if needed */}
+      {/* Floating controls that appear on touch */}
+      <TouchableOpacity 
+        style={styles.floatingControls}
+        onPress={() => setPlaying(!playing)}
+      >
+        <View style={styles.controlButton}>
+          <Ionicons 
+            name={playing ? "pause" : "play"} 
+            size={24} 
+            color="#FFF" 
+          />
+        </View>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -227,68 +244,83 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     borderRadius: 16,
     overflow: "hidden",
-  },
+  } as ViewStyle,
   playerContainer: {
     width: "100%",
     aspectRatio: 16 / 9,
     backgroundColor: "#000",
     position: "relative",
-  },
+  } as ViewStyle,
   titleContainer: {
     padding: 10,
     backgroundColor: "#111",
-  },
+  } as ViewStyle,
   titleText: {
     color: "#FFF",
     fontSize: 16,
     fontWeight: "bold",
-  },
+  } as TextStyle,
   channelText: {
     color: "#AAA",
     fontSize: 14,
     marginTop: 4,
-  },
+  } as TextStyle,
   loadingContainer: {
     aspectRatio: 16 / 9,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
-  },
+  } as ViewStyle,
   loadingText: {
     color: "#FFF",
     marginTop: 12,
     fontSize: 16,
-  },
+  } as TextStyle,
   errorContainer: {
     aspectRatio: 16 / 9,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
     padding: 20,
-  },
+  } as ViewStyle,
   errorText: {
     color: "#FFF",
     fontSize: 16,
     textAlign: "center",
     marginTop: 10,
-  },
+  } as TextStyle,
   retryButton: {
     marginTop: 20,
     paddingVertical: 8,
     paddingHorizontal: 20,
     backgroundColor: "#00E0FF",
     borderRadius: 8,
-  },
+  } as ViewStyle,
   retryText: {
     color: "#000",
     fontWeight: "bold",
-  },
+  } as TextStyle,
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
+  } as ViewStyle,
+  floatingControls: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [
+      { translateX: Number(-25) },
+      { translateY: Number(-25) }
+    ],
+    opacity: 0.8,
+  } as ViewStyle,
+  controlButton: {
+    padding: 12,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  } as ViewStyle,
 })
 
 export default VideoPlayer
