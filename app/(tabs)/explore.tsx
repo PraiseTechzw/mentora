@@ -12,7 +12,8 @@ import {
   Dimensions,
   Animated,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  TextInput
 } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
@@ -90,6 +91,7 @@ export default function ExploreScreen() {
     points: 0
   })
   const [categories, setCategories] = useState<any[]>([])
+  const [showFilters, setShowFilters] = useState(false)
 
   // Load all content when component mounts or when search/category/filters/sort changes
   useEffect(() => {
@@ -562,17 +564,83 @@ export default function ExploreScreen() {
 
           {/* Search and filter */}
           <View style={styles.searchContainer}>
-            <SearchAndFilter
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              onFilterChange={setActiveFilters}
-              onSortChange={setActiveSort}
-              activeFilters={activeFilters}
-              activeSort={activeSort}
-              filterOptions={FILTER_OPTIONS}
-              sortOptions={SORT_OPTIONS}
-              placeholder="Search for topics, courses, or instructors"
-            />
+            <View style={styles.searchInputContainer}>
+              <FontAwesome5 name="search" size={18} color="#666" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search for topics, courses, or instructors"
+                placeholderTextColor="#666"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")}>
+                  <FontAwesome5 name="times-circle" size={18} color="#666" />
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={[styles.searchIconContainer, { marginTop: 12 }]}>
+              <TouchableOpacity 
+                style={styles.filterIcon}
+                onPress={() => setShowFilters(true)}
+              >
+                <FontAwesome5 name="filter" size={18} color="#666" />
+                {activeFilters.length > 0 && (
+                  <View style={{
+                    position: "absolute",
+                    top: -4,
+                    right: -4,
+                    backgroundColor: "#FF6B6B",
+                    borderRadius: 10,
+                    minWidth: 20,
+                    height: 20,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    paddingHorizontal: 4,
+                  }}>
+                    <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "600" }}>
+                      {activeFilters.length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+            {activeFilters.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: 12 }}
+              >
+                {activeFilters.map((filterId) => {
+                  const filter = FILTER_OPTIONS.find(f => f.id === filterId);
+                  return filter ? (
+                    <View
+                      key={filterId}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: "#F0F0F0",
+                        borderRadius: 20,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        marginRight: 8,
+                      }}
+                    >
+                      <Text style={{ color: "#333", marginRight: 4 }}>{filter.label}</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setActiveFilters(activeFilters.filter(id => id !== filterId));
+                        }}
+                      >
+                        <FontAwesome5 name="times" size={14} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null;
+                })}
+              </ScrollView>
+            )}
           </View>
 
           {/* Featured content carousel */}
@@ -782,8 +850,57 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 16,
+    marginTop: 16,
+    marginBottom: 24,
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  searchInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  searchInput: {
+    flex: 1,
+    height: 48,
+    fontSize: 16,
+    color: "#333",
+    paddingHorizontal: 12,
+  },
+  searchIconContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#4361EE",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#4361EE",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  filterIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F5F5F5",
+    justifyContent: "center",
+    alignItems: "center",
   },
   sectionHeader: {
     flexDirection: "row",
