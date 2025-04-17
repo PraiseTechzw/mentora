@@ -46,15 +46,10 @@ const { width } = Dimensions.get("window")
 const CARD_WIDTH = width * 0.8
 const CARD_SPACING = 10
 
-const getDayOfDay = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) {
-    return "Good Morning";
-  } else if (hour < 18) {
-    return "Good Afternoon";
-  } else {
-    return "Good Evening";
-  }
+const getDayOfWeek = () => {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const today = new Date().getDay();
+  return days[today];
 };
 
 export default function ExploreScreen() {
@@ -423,7 +418,8 @@ export default function ExploreScreen() {
           {/* Header with greeting */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.greeting}>{getDayOfDay()}</Text>
+              <Text style={styles.greeting}>{getDayOfWeek()}</Text>
+              <Text style={styles.subGreeting}>What would you like to learn today?</Text>
             </View>
             <View style={styles.userStats}>
               <View style={styles.userStatItem}>
