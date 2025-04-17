@@ -31,17 +31,16 @@ import {
 } from "../../services/content-aggregator"
 import { AggregatedVideo } from "../../types/videoag"
 
-// Categories with icons and colors
-const CATEGORIES = [
-  { id: "1", name: "Programming", icon: "laptop-code", color: "#4361EE" },
-  { id: "2", name: "Mathematics", icon: "square-root-alt", color: "#3A0CA3" },
-  { id: "3", name: "Science", icon: "flask", color: "#7209B7" },
-  { id: "4", name: "History", icon: "landmark", color: "#F72585" },
-  { id: "5", name: "Languages", icon: "language", color: "#4CC9F0" },
-  { id: "6", name: "Arts", icon: "paint-brush", color: "#F77F00" },
-  { id: "7", name: "Business", icon: "chart-line", color: "#4D908E" },
-  { id: "8", name: "Health", icon: "heartbeat", color: "#F94144" },
-]
+// Define category colors and icons
+const CATEGORY_COLORS = [
+  "#4361EE", "#3A0CA3", "#7209B7", "#F72585", 
+  "#4CC9F0", "#F77F00", "#4D908E", "#F94144"
+];
+
+const CATEGORY_ICONS = [
+  "laptop-code", "square-root-alt", "flask", "landmark", 
+  "language", "paint-brush", "chart-line", "heartbeat"
+];
 
 const { width } = Dimensions.get("window")
 const CARD_WIDTH = width * 0.8
@@ -75,12 +74,24 @@ export default function ExploreScreen() {
     streak: 0,
     points: 0
   })
+  const [categories, setCategories] = useState<any[]>([])
 
   // Load all content when component mounts or when search/category changes
   useEffect(() => {
     const loadAllContent = async () => {
       setIsLoading(true)
       try {
+        // Generate categories dynamically
+        const categoryNames = ["Programming", "Mathematics", "Science", "History", 
+                              "Languages", "Arts", "Business", "Health"];
+        const categoriesData = categoryNames.map((name, index) => ({
+          id: `${index + 1}`,
+          name,
+          icon: CATEGORY_ICONS[index % CATEGORY_ICONS.length],
+          color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]
+        }));
+        setCategories(categoriesData);
+        
         // Load main videos based on search/category
         const mainContent = await getAggregatedContent(searchQuery, activeCategory)
         setVideos(mainContent)
@@ -100,7 +111,7 @@ export default function ExploreScreen() {
         
         // Load learning paths (in a real app, this would come from an API)
         // For now, we'll generate learning paths based on categories
-        const learningPathsData = CATEGORIES.slice(0, 3).map((category, index) => ({
+        const learningPathsData = categoriesData.slice(0, 3).map((category, index) => ({
           id: `lp${index + 1}`,
           title: `${category.name} Path`,
           description: `Master ${category.name.toLowerCase()} concepts and skills`,
@@ -428,11 +439,11 @@ export default function ExploreScreen() {
 
           {/* Search bar */}
           <View style={styles.searchContainer}>
-      <SearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="Search for topics, courses, or instructors"
-      />
+            <SearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search for topics, courses, or instructors"
+            />
             <TouchableOpacity style={styles.filterButton}>
               <FontAwesome5 name="sliders-h" size={16} color="#666" />
             </TouchableOpacity>
@@ -506,19 +517,19 @@ export default function ExploreScreen() {
           {/* Categories */}
           <View style={styles.categoriesContainer}>
             <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>Browse Categories</Text>
+              <Text style={styles.sectionTitle}>Browse Categories</Text>
               <TouchableOpacity>
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-      <FlatList
-        data={CATEGORIES}
-        renderItem={renderCategoryItem}
-        keyExtractor={(item) => item.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      />
+            <FlatList
+              data={categories}
+              renderItem={renderCategoryItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesList}
+            />
           </View>
 
           {/* Recently viewed */}
@@ -567,18 +578,18 @@ export default function ExploreScreen() {
           {/* Trending courses */}
           <View style={styles.trendingContainer}>
             <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>Trending Courses</Text>
+              <Text style={styles.sectionTitle}>Trending Courses</Text>
               <TouchableOpacity>
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
             {trendingCourses.length > 0 ? (
-      <FlatList
+              <FlatList
                 data={trendingCourses}
-        renderItem={renderTrendingCourse}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.trendingList}
+                renderItem={renderTrendingCourse}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.trendingList}
                 scrollEnabled={false}
               />
             ) : (
