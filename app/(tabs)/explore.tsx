@@ -20,7 +20,7 @@ import { FontAwesome5 } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import { useRouter } from "expo-router"
 
-import { SearchBar } from "../../components/SearchBar"
+import { SearchAndFilter, FilterOption, SortOption } from "../../components/SearchAndFilter"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
 import { 
   getAggregatedContent, 
@@ -41,6 +41,25 @@ const CATEGORY_ICONS = [
   "language", "paint-brush", "chart-line", "heartbeat"
 ];
 
+// Define filter and sort options
+const FILTER_OPTIONS: FilterOption[] = [
+  { id: 'free', label: 'Free Content', value: 'free' },
+  { id: 'premium', label: 'Premium Content', value: 'premium' },
+  { id: 'new', label: 'New Content', value: 'new' },
+  { id: 'popular', label: 'Popular Content', value: 'popular' },
+  { id: 'short', label: 'Short Videos (< 10 min)', value: 'short' },
+  { id: 'medium', label: 'Medium Videos (10-30 min)', value: 'medium' },
+  { id: 'long', label: 'Long Videos (> 30 min)', value: 'long' },
+];
+
+const SORT_OPTIONS: SortOption[] = [
+  { id: 'newest', label: 'Newest First', value: 'newest' },
+  { id: 'oldest', label: 'Oldest First', value: 'oldest' },
+  { id: 'popular', label: 'Most Popular', value: 'popular' },
+  { id: 'rating', label: 'Highest Rated', value: 'rating' },
+  { id: 'duration', label: 'Duration', value: 'duration' },
+];
+
 const { width } = Dimensions.get("window")
 const CARD_WIDTH = width * 0.8
 const CARD_SPACING = 10
@@ -56,6 +75,8 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState("")
   const [refreshing, setRefreshing] = useState(false)
   const [activeCategory, setActiveCategory] = useState("all")
+  const [activeFilters, setActiveFilters] = useState<string[]>([])
+  const [activeSort, setActiveSort] = useState("newest")
   const scrollX = useRef(new Animated.Value(0)).current
   const [isLoading, setIsLoading] = useState(true)
   const [videos, setVideos] = useState<AggregatedVideo[]>([])
@@ -70,7 +91,7 @@ export default function ExploreScreen() {
   })
   const [categories, setCategories] = useState<any[]>([])
 
-  // Load all content when component mounts or when search/category changes
+  // Load all content when component mounts or when search/category/filters/sort changes
   useEffect(() => {
     const loadAllContent = async () => {
       setIsLoading(true)
@@ -86,9 +107,67 @@ export default function ExploreScreen() {
         }));
         setCategories(categoriesData);
         
-        // Load main videos based on search/category
+        // Load main videos based on search/category/filters
         const mainContent = await getAggregatedContent(searchQuery, activeCategory)
-        setVideos(mainContent)
+        let filteredContent = mainContent;
+        
+        // Apply filters
+        if (activeFilters.includes('free')) {
+          filteredContent = filteredContent.filter(video => !video.isPremium);
+        }
+        if (activeFilters.includes('premium')) {
+          filteredContent = filteredContent.filter(video => video.isPremium);
+        }
+        if (activeFilters.includes('short')) {
+          filteredContent = filteredContent.filter(video => {
+            const duration = video.duration || '';
+            return duration.includes('min') && parseInt(duration) < 10;
+          });
+        }
+        if (activeFilters.includes('medium')) {
+          filteredContent = filteredContent.filter(video => {
+            const duration = video.duration || '';
+            return duration.includes('min') && parseInt(duration) >= 10 && parseInt(duration) <= 30;
+          });
+        }
+        if (activeFilters.includes('long')) {
+          filteredContent = filteredContent.filter(video => {
+            const duration = video.duration || '';
+            return duration.includes('min') && parseInt(duration) > 30;
+          });
+        }
+        
+        // Apply sorting
+        switch (activeSort) {
+          case 'newest':
+            filteredContent.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+            break;
+          case 'oldest':
+            filteredContent.sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
+            break;
+          case 'popular':
+            filteredContent.sort((a, b) => (b.views || 0) - (a.views || 0));
+            break;
+          case 'rating':
+            filteredContent.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+            break;
+          case 'duration':
+            filteredContent.sort((a, b) => {
+              const getDurationInMinutes = (duration: string) => {
+                if (!duration) return 0;
+                if (duration.includes('hour')) {
+                  const hours = parseInt(duration.split('hour')[0]);
+                  const minutes = duration.includes('min') ? parseInt(duration.split('hour')[1].split('min')[0]) : 0;
+                  return hours * 60 + minutes;
+                }
+                return parseInt(duration) || 0;
+              };
+              return getDurationInMinutes(b.duration) - getDurationInMinutes(a.duration);
+            });
+            break;
+        }
+        
+        setVideos(filteredContent);
         
         // Load featured content (trending educational videos)
         const featured = await getTrendingContent(true)
@@ -138,14 +217,72 @@ export default function ExploreScreen() {
     }
     
     loadAllContent()
-  }, [searchQuery, activeCategory])
+  }, [searchQuery, activeCategory, activeFilters, activeSort])
 
   const onRefresh = async () => {
     setRefreshing(true)
     try {
       // Refresh all content
       const mainContent = await getAggregatedContent(searchQuery, activeCategory)
-      setVideos(mainContent)
+      let filteredContent = mainContent;
+      
+      // Apply filters
+      if (activeFilters.includes('free')) {
+        filteredContent = filteredContent.filter(video => !video.isPremium);
+      }
+      if (activeFilters.includes('premium')) {
+        filteredContent = filteredContent.filter(video => video.isPremium);
+      }
+      if (activeFilters.includes('short')) {
+        filteredContent = filteredContent.filter(video => {
+          const duration = video.duration || '';
+          return duration.includes('min') && parseInt(duration) < 10;
+        });
+      }
+      if (activeFilters.includes('medium')) {
+        filteredContent = filteredContent.filter(video => {
+          const duration = video.duration || '';
+          return duration.includes('min') && parseInt(duration) >= 10 && parseInt(duration) <= 30;
+        });
+      }
+      if (activeFilters.includes('long')) {
+        filteredContent = filteredContent.filter(video => {
+          const duration = video.duration || '';
+          return duration.includes('min') && parseInt(duration) > 30;
+        });
+      }
+      
+      // Apply sorting
+      switch (activeSort) {
+        case 'newest':
+          filteredContent.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+          break;
+        case 'oldest':
+          filteredContent.sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime());
+          break;
+        case 'popular':
+          filteredContent.sort((a, b) => (b.views || 0) - (a.views || 0));
+          break;
+        case 'rating':
+          filteredContent.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+          break;
+        case 'duration':
+          filteredContent.sort((a, b) => {
+            const getDurationInMinutes = (duration: string) => {
+              if (!duration) return 0;
+              if (duration.includes('hour')) {
+                const hours = parseInt(duration.split('hour')[0]);
+                const minutes = duration.includes('min') ? parseInt(duration.split('hour')[1].split('min')[0]) : 0;
+                return hours * 60 + minutes;
+              }
+              return parseInt(duration) || 0;
+            };
+            return getDurationInMinutes(b.duration) - getDurationInMinutes(a.duration);
+          });
+          break;
+      }
+      
+      setVideos(filteredContent);
       
       const featured = await getTrendingContent(true)
       setFeaturedContent(featured.slice(0, 5))
@@ -347,7 +484,7 @@ export default function ExploreScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Popular Channels</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push("/see-all/channels")}>
             <Text style={styles.seeAllButton}>See All</Text>
           </TouchableOpacity>
         </View>
@@ -423,16 +560,19 @@ export default function ExploreScreen() {
             </View>
           </View>
 
-          {/* Search bar */}
+          {/* Search and filter */}
           <View style={styles.searchContainer}>
-      <SearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="Search for topics, courses, or instructors"
-      />
-            <TouchableOpacity style={styles.filterButton}>
-              <FontAwesome5 name="sliders-h" size={16} color="#666" />
-            </TouchableOpacity>
+            <SearchAndFilter
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onFilterChange={setActiveFilters}
+              onSortChange={setActiveSort}
+              activeFilters={activeFilters}
+              activeSort={activeSort}
+              filterOptions={FILTER_OPTIONS}
+              sortOptions={SORT_OPTIONS}
+              placeholder="Search for topics, courses, or instructors"
+            />
           </View>
 
           {/* Featured content carousel */}
@@ -548,7 +688,7 @@ export default function ExploreScreen() {
           {/* Trending courses */}
           <View style={styles.section}>
             {renderSectionHeader('Trending Courses', '/see-all/courses')}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.coursesContainer}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trendingContainer}>
               {trendingCourses.length > 0 ? (
       <FlatList
                   data={trendingCourses}
@@ -641,25 +781,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: 16,
     marginTop: 8,
     marginBottom: 16,
-  },
-  filterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
   },
   sectionHeader: {
     flexDirection: "row",
