@@ -474,11 +474,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             transform: translate(-50%, -50%);
             color: white;
             font-family: Arial, sans-serif;
+            text-align: center;
+          }
+          .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto 10px;
+          }
+          @keyframes spin {
+            to { transform: rotate(360deg); }
           }
         </style>
       </head>
       <body>
-        <div id="loading" class="loading">Loading video...</div>
+        <div id="loading" class="loading">
+          <div class="loading-spinner"></div>
+          <div>Loading video...</div>
+        </div>
         <iframe 
           id="videoPlayer"
           src="${videoUrl}"
@@ -488,13 +504,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           onload="handleIframeLoad()"
         ></iframe>
         <script>
+          let player;
+          let duration = 0;
+          
           function handleIframeLoad() {
-            document.getElementById('loading').style.display = 'none';
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'loaded',
-              duration: 0
-            }));
+            const iframe = document.getElementById('videoPlayer');
+            player = iframe.contentWindow;
+            
+            // Listen for YouTube player events
+            window.addEventListener('message', function(event) {
+              if (event.origin === 'https://www.youtube.com') {
+                const data = JSON.parse(event.data);
+                if (data.info) {
+                  duration = data.info.duration;
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'loaded',
+                    duration: duration
+                  }));
+                  document.getElementById('loading').style.display = 'none';
+                }
+              }
+            });
+            
+            // Send ready event to YouTube player
+            player.postMessage('{"event":"listening","id":"videoPlayer","channel":"widget"}', '*');
           }
+          
+          // Request video info periodically until we get the duration
+          function requestVideoInfo() {
+            if (player && !duration) {
+              player.postMessage('{"event":"command","func":"getVideoData","args":""}', '*');
+              setTimeout(requestVideoInfo, 1000);
+            }
+          }
+          
+          // Start requesting video info
+          setTimeout(requestVideoInfo, 1000);
         </script>
       </body>
     </html>
