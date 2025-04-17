@@ -467,15 +467,35 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             height: 100%;
             border: none;
           }
+          .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: Arial, sans-serif;
+          }
         </style>
       </head>
       <body>
+        <div id="loading" class="loading">Loading video...</div>
         <iframe 
           id="videoPlayer"
           src="${videoUrl}"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowfullscreen
+          onload="handleIframeLoad()"
         ></iframe>
+        <script>
+          function handleIframeLoad() {
+            document.getElementById('loading').style.display = 'none';
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'loaded',
+              duration: 0
+            }));
+          }
+        </script>
       </body>
     </html>
   `

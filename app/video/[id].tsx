@@ -108,7 +108,14 @@ export default function VideoScreen() {
         // Convert YouTube URLs to embed format if needed
         if (!videoUrl.includes('embed')) {
           const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
-          videoUrl = `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&autoplay=1&playsinline=1`;
+          videoUrl = `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0&autoplay=1&playsinline=1&enablejsapi=1`;
+        } else {
+          // Add necessary parameters to existing embed URL
+          const url = new URL(videoUrl);
+          url.searchParams.set('autoplay', '1');
+          url.searchParams.set('playsinline', '1');
+          url.searchParams.set('enablejsapi', '1');
+          videoUrl = url.toString();
         }
       }
 
