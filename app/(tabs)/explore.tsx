@@ -99,36 +99,17 @@ export default function ExploreScreen() {
         setRecentlyViewed(recent.slice(0, 5))
         
         // Load learning paths (in a real app, this would come from an API)
-        // For now, we'll use a simplified version of the mock data
-        setLearningPaths([
-          {
-            id: "lp1",
-            title: "Full-Stack Developer",
-            description: "Master front-end and back-end development",
-            icon: "code",
-            duration: "6 months",
-            level: "Intermediate",
-            courses: 12,
-          },
-          {
-            id: "lp2",
-            title: "Data Scientist",
-            description: "Learn data analysis and machine learning",
-            icon: "chart-bar",
-            duration: "8 months",
-            level: "Advanced",
-            courses: 15,
-          },
-          {
-            id: "lp3",
-            title: "Digital Marketing",
-            description: "Master online marketing strategies",
-            icon: "bullhorn",
-            duration: "4 months",
-            level: "Beginner",
-            courses: 8,
-          },
-        ])
+        // For now, we'll generate learning paths based on categories
+        const learningPathsData = CATEGORIES.slice(0, 3).map((category, index) => ({
+          id: `lp${index + 1}`,
+          title: `${category.name} Path`,
+          description: `Master ${category.name.toLowerCase()} concepts and skills`,
+          icon: category.icon,
+          duration: `${Math.floor(Math.random() * 6) + 3} months`,
+          level: ["Beginner", "Intermediate", "Advanced"][Math.floor(Math.random() * 3)],
+          courses: Math.floor(Math.random() * 10) + 5,
+        }))
+        setLearningPaths(learningPathsData)
         
         // Load popular channels
         const channels = await discoverEducationalChannels()
