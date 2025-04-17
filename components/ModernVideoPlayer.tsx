@@ -1,10 +1,11 @@
 "use client"
 
-import type React from "react"
-import { useState, useRef, useEffect } from "react"
-import { View, StyleSheet, Dimensions, ActivityIndicator, Text, TouchableOpacity, ViewStyle, TextStyle } from "react-native"
+import React, { useState, useRef, useEffect } from "react"
+import { View, StyleSheet, Dimensions, ActivityIndicator, Text, TouchableOpacity, ViewStyle, TextStyle, Platform, StatusBar } from "react-native"
 import YoutubeIframe from "react-native-youtube-iframe"
 import { Ionicons } from "@expo/vector-icons"
+import * as ScreenOrientation from 'expo-screen-orientation'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 interface VideoPlayerProps {
   videoUrl: string
@@ -29,7 +30,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [videoId, setVideoId] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isPortrait, setIsPortrait] = useState(true)
   const playerRef = useRef(null)
+  const insets = useSafeAreaInsets()
 
   // Extract YouTube video ID from URL
   useEffect(() => {
@@ -65,6 +69,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [videoUrl])
 
+  // Handle orientation changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      const isPortraitMode = window.width < window.height
+      setIsPortrait(isPortraitMode)
+      
+      // If in fullscreen and orientation changes, update fullscreen state
+      if (isFullscreen) {
+        handleFullscreenToggle()
+      }
+    })
+
+    return () => {
+      subscription.remove()
+    }
+  }, [isFullscreen])
+
   // Handle state changes
   const onStateChange = (state: string) => {
     console.log("Player state changed:", state)
@@ -72,6 +93,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onComplete?.()
     } else if (state === "playing") {
       setIsLoading(false)
+    }
+  }
+
+  const handleFullscreenToggle = async () => {
+    try {
+      if (isFullscreen) {
+        // Exit fullscreen
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT)
+        setIsFullscreen(false)
+      } else {
+        // Enter fullscreen
+        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+        setIsFullscreen(true)
+      }
+    } catch (error) {
+      console.error("Error toggling fullscreen:", error)
     }
   }
 
@@ -124,8 +161,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }
 
   return (
-    <View style={[styles.container, style]}>
-      {title && (
+    <View style={[
+      styles.container, 
+      style,
+      isFullscreen && styles.fullscreenContainer
+    ]}>
+      {title && !isFullscreen && (
         <View style={styles.titleContainer}>
           <Text style={styles.titleText} numberOfLines={1}>
             {title}
@@ -134,11 +175,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </View>
       )}
 
-      <View style={styles.playerContainer}>
+      <View style={[
+        styles.playerContainer,
+        isFullscreen && styles.fullscreenPlayer
+      ]}>
         <YoutubeIframe
           ref={playerRef}
-          height={220}
-          width={+(Dimensions.get("window").width)}
+          height={isFullscreen ? Dimensions.get('window').width : 220}
+          width={isFullscreen ? Dimensions.get('window').height : +(Dimensions.get("window").width)}
           videoId={videoId}
           play={autoPlay}
           onChangeState={onStateChange}
@@ -181,6 +225,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <ActivityIndicator size="large" color="#00E0FF" />
           </View>
         )}
+        
+        {!isLoading && (
+          <TouchableOpacity 
+            style={styles.fullscreenButton}
+            onPress={handleFullscreenToggle}
+          >
+            <Ionicons 
+              name={isFullscreen ? "contract" : "expand"} 
+              size={24} 
+              color="#FFF" 
+            />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   )
@@ -192,26 +249,51 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     borderRadius: 16,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  } as ViewStyle,
+  fullscreenContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 0,
+    zIndex: 999,
   } as ViewStyle,
   playerContainer: {
     width: "100%",
     aspectRatio: 16 / 9,
     backgroundColor: "#000",
     position: "relative",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255, 255, 255, 0.1)",
+  } as ViewStyle,
+  fullscreenPlayer: {
+    width: '100%',
+    height: '100%',
+    aspectRatio: undefined,
   } as ViewStyle,
   titleContainer: {
-    padding: 10,
+    padding: 16,
     backgroundColor: "#111",
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   } as ViewStyle,
   titleText: {
     color: "#FFF",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
+    letterSpacing: 0.5,
   } as TextStyle,
   channelText: {
     color: "#AAA",
     fontSize: 14,
-    marginTop: 4,
+    marginTop: 6,
+    fontWeight: "500",
   } as TextStyle,
   loadingContainer: {
     aspectRatio: 16 / 9,
@@ -221,38 +303,59 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   loadingText: {
     color: "#FFF",
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
+    fontWeight: "500",
   } as TextStyle,
   errorContainer: {
     aspectRatio: 16 / 9,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#000",
-    padding: 20,
+    padding: 24,
   } as ViewStyle,
   errorText: {
     color: "#FFF",
     fontSize: 16,
     textAlign: "center",
-    marginTop: 10,
+    marginTop: 16,
+    lineHeight: 22,
   } as TextStyle,
   retryButton: {
-    marginTop: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     backgroundColor: "#00E0FF",
-    borderRadius: 8,
+    borderRadius: 12,
+    shadowColor: "#00E0FF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   } as ViewStyle,
   retryText: {
     color: "#000",
     fontWeight: "bold",
+    fontSize: 16,
   } as TextStyle,
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backdropFilter: "blur(4px)",
+  } as ViewStyle,
+  fullscreenButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   } as ViewStyle,
 })
 
