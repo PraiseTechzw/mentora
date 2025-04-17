@@ -5,8 +5,9 @@ import { StyleSheet, View, Text, TouchableOpacity, Pressable, ActivityIndicator,
 import { Image } from "expo-image"
 import { FontAwesome5 } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated"
+import Animated, { FadeIn, FadeOut, useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated"
 import { AggregatedVideo } from "../types/videoag"
+import { BlurView } from "expo-blur"
 
 interface ModernVideoCardProps {
   video: AggregatedVideo
@@ -19,6 +20,10 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
   const [showOptions, setShowOptions] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
   const [imageError, setImageError] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const scaleAnim = useAnimatedStyle(() => ({
+    transform: [{ scale: withSpring(isHovered ? 1.02 : 1) }]
+  }))
 
   const getSourceIcon = (source: string) => {
     switch (source) {
@@ -91,145 +96,179 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
     }
   }
 
+  const formatViews = (views: string) => {
+    const num = parseInt(views)
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(1)}M`
+    } else if (num >= 1000) {
+      return `${(num / 1000).toFixed(1)}K`
+    }
+    return views
+  }
+
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={handleLongPress}
-      onPressIn={() => setIsPressed(true)}
-      onPressOut={() => setIsPressed(false)}
-      style={[styles.container, isPressed && styles.pressed, style]}
-    >
-      <View style={styles.thumbnailContainer}>
-        {imageLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF6B6B" />
-          </View>
-        )}
-        
-        <Image 
-          source={video.thumbnail} 
-          style={[styles.thumbnail, imageLoading && styles.hiddenImage]} 
-          contentFit="cover"
-          onLoadStart={() => setImageLoading(true)}
-          onLoadEnd={() => setImageLoading(false)}
-          onError={() => {
-            setImageError(true)
-            setImageLoading(false)
-          }}
-        />
-        
-        {!imageError && (
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
-            style={styles.gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
-        )}
-        
-        <View style={styles.playButtonContainer}>
-          <View style={styles.playButton}>
-            <FontAwesome5 name="play" size={16} color="#FFF" />
-          </View>
-        </View>
-        
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>{video.duration}</Text>
-        </View>
-        
-        <View style={[styles.sourceBadge, { backgroundColor: getSourceColor(video.source) }]}>
-          <FontAwesome5 name={getSourceIcon(video.source)} size={10} color="#FFF" />
-        </View>
-        
-        {video.isFree && (
-          <View style={styles.freeBadge}>
-            <FontAwesome5 name="gift" size={10} color="#FFF" />
-            <Text style={styles.freeText}>FREE</Text>
-          </View>
-        )}
-      </View>
-      
-      <View style={styles.infoContainer}>
-        <Text style={styles.title} numberOfLines={2}>
-          {video.title}
-        </Text>
-        
-        <View style={styles.metadataRow}>
-          <Text style={styles.channelName}>{video.channelName}</Text>
+    <Animated.View style={[scaleAnim]}>
+      <Pressable
+        onPress={onPress}
+        onLongPress={handleLongPress}
+        onPressIn={() => {
+          setIsPressed(true)
+          setIsHovered(true)
+        }}
+        onPressOut={() => {
+          setIsPressed(false)
+          setIsHovered(false)
+        }}
+        style={[styles.container, isPressed && styles.pressed, style]}
+      >
+        <View style={styles.thumbnailContainer}>
+          {imageLoading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#FF6B6B" />
+            </View>
+          )}
           
-          {video.rating && (
-            <View style={styles.ratingContainer}>
-              <FontAwesome5 name="star" size={12} color="#FFD700" />
-              <Text style={styles.ratingText}>{video.rating}</Text>
+          <Image 
+            source={video.thumbnail} 
+            style={[styles.thumbnail, imageLoading && styles.hiddenImage]} 
+            contentFit="cover"
+            onLoadStart={() => setImageLoading(true)}
+            onLoadEnd={() => setImageLoading(false)}
+            onError={() => {
+              setImageError(true)
+              setImageLoading(false)
+            }}
+          />
+          
+          {!imageError && (
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.7)"]}
+              style={styles.gradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+            />
+          )}
+          
+          <View style={styles.playButtonContainer}>
+            <Animated.View 
+              style={[
+                styles.playButton,
+                { transform: [{ scale: isHovered ? 1.1 : 1 }] }
+              ]}
+            >
+              <FontAwesome5 name="play" size={16} color="#FFF" />
+            </Animated.View>
+          </View>
+          
+          <View style={styles.durationBadge}>
+            <Text style={styles.durationText}>{video.duration}</Text>
+          </View>
+          
+          <View style={[styles.sourceBadge, { backgroundColor: getSourceColor(video.source) }]}>
+            <FontAwesome5 name={getSourceIcon(video.source)} size={10} color="#FFF" />
+          </View>
+          
+          {video.isFree && (
+            <View style={styles.freeBadge}>
+              <FontAwesome5 name="gift" size={10} color="#FFF" />
+              <Text style={styles.freeText}>FREE</Text>
             </View>
           )}
         </View>
         
-        {(video.instructor || video.institution) && (
-          <View style={styles.instructorRow}>
-            {video.instructor && (
-              <View style={styles.instructorContainer}>
-                <FontAwesome5 name="user-tie" size={10} color="#666" />
-                <Text style={styles.instructorText} numberOfLines={1}>{video.instructor}</Text>
-              </View>
-            )}
+        <View style={styles.infoContainer}>
+          <Text style={styles.title} numberOfLines={2}>
+            {video.title}
+          </Text>
+          
+          <View style={styles.metadataRow}>
+            <Text style={styles.channelName}>{video.channelName}</Text>
             
-            {video.institution && (
-              <View style={styles.institutionContainer}>
-                <FontAwesome5 name="university" size={10} color="#666" />
-                <Text style={styles.institutionText} numberOfLines={1}>{video.institution}</Text>
+            {video.rating && (
+              <View style={styles.ratingContainer}>
+                <FontAwesome5 name="star" size={12} color="#FFD700" />
+                <Text style={styles.ratingText}>{video.rating}</Text>
               </View>
             )}
           </View>
-        )}
-        
-        <Text style={styles.metadata}>
-          {video.views} views • {formatDate(video.publishedAt)}
-        </Text>
-        
-        {video.categories && video.categories.length > 0 && (
-          <View style={styles.categoriesContainer}>
-            {video.categories.slice(0, 2).map((category, index) => (
-              <View key={index} style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{category}</Text>
-              </View>
-            ))}
-            {video.categories.length > 2 && (
-              <Text style={styles.moreCategoriesText}>+{video.categories.length - 2}</Text>
-            )}
-          </View>
-        )}
-      </View>
-
-      {showOptions && (
-        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.optionsOverlay}>
-          <Pressable style={styles.overlayBackground} onPress={() => setShowOptions(false)}>
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="clock" size={16} color="#333" />
-                <Text style={styles.optionText}>Watch Later</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="list" size={16} color="#333" />
-                <Text style={styles.optionText}>Add to Playlist</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="download" size={16} color="#333" />
-                <Text style={styles.optionText}>Download</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="share" size={16} color="#333" />
-                <Text style={styles.optionText}>Share</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.optionButton}>
-                <FontAwesome5 name="ban" size={16} color="#333" />
-                <Text style={styles.optionText}>Not Interested</Text>
-              </TouchableOpacity>
+          
+          {(video.instructor || video.institution) && (
+            <View style={styles.instructorRow}>
+              {video.instructor && (
+                <View style={styles.instructorContainer}>
+                  <FontAwesome5 name="user-tie" size={10} color="#666" />
+                  <Text style={styles.instructorText} numberOfLines={1}>{video.instructor}</Text>
+                </View>
+              )}
+              
+              {video.institution && (
+                <View style={styles.institutionContainer}>
+                  <FontAwesome5 name="university" size={10} color="#666" />
+                  <Text style={styles.institutionText} numberOfLines={1}>{video.institution}</Text>
+                </View>
+              )}
             </View>
-          </Pressable>
-        </Animated.View>
-      )}
-    </Pressable>
+          )}
+          
+          <View style={styles.metadataContainer}>
+            <Text style={styles.metadata}>
+              {formatViews(video.views)} views • {formatDate(video.publishedAt)}
+            </Text>
+            {video.price && (
+              <Text style={styles.priceText}>
+                {video.isFree ? "Free" : `$${video.price}`}
+              </Text>
+            )}
+          </View>
+          
+          {video.categories && video.categories.length > 0 && (
+            <View style={styles.categoriesContainer}>
+              {video.categories.slice(0, 2).map((category, index) => (
+                <View key={index} style={styles.categoryBadge}>
+                  <Text style={styles.categoryText}>{category}</Text>
+                </View>
+              ))}
+              {video.categories.length > 2 && (
+                <Text style={styles.moreCategoriesText}>+{video.categories.length - 2}</Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        {showOptions && (
+          <Animated.View 
+            entering={FadeIn.duration(200)} 
+            exiting={FadeOut.duration(200)} 
+            style={styles.optionsOverlay}
+          >
+            <BlurView intensity={50} style={styles.overlayBackground}>
+              <View style={styles.optionsContainer}>
+                <TouchableOpacity style={styles.optionButton}>
+                  <FontAwesome5 name="clock" size={16} color="#333" />
+                  <Text style={styles.optionText}>Watch Later</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.optionButton}>
+                  <FontAwesome5 name="list" size={16} color="#333" />
+                  <Text style={styles.optionText}>Add to Playlist</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.optionButton}>
+                  <FontAwesome5 name="download" size={16} color="#333" />
+                  <Text style={styles.optionText}>Download</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.optionButton}>
+                  <FontAwesome5 name="share" size={16} color="#333" />
+                  <Text style={styles.optionText}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.optionButton}>
+                  <FontAwesome5 name="ban" size={16} color="#333" />
+                  <Text style={styles.optionText}>Not Interested</Text>
+                </TouchableOpacity>
+              </View>
+            </BlurView>
+          </Animated.View>
+        )}
+      </Pressable>
+    </Animated.View>
   )
 }
 
@@ -411,10 +450,20 @@ const styles = StyleSheet.create({
     color: "#666",
     marginLeft: 4,
   },
+  metadataContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   metadata: {
     fontSize: 12,
     color: "#999",
-    marginBottom: 4,
+  },
+  priceText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#4CAF50",
   },
   categoriesContainer: {
     flexDirection: "row",
@@ -448,15 +497,25 @@ const styles = StyleSheet.create({
   },
   overlayBackground: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   optionsContainer: {
-    backgroundColor: "#FFF",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderRadius: 12,
     width: "80%",
     padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
   optionButton: {
     flexDirection: "row",
