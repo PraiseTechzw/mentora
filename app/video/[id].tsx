@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Animated, Dimensions, StatusBar, Platform } from "react-native"
+import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Animated, Dimensions } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
@@ -8,7 +8,6 @@ import VideoPlayer from "../../components/ModernVideoPlayer"
 import { FontAwesome5 } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import { BlurView } from "expo-blur"
-import * as ScreenOrientation from 'expo-screen-orientation'
 
 export default function VideoScreen() {
   const params = useLocalSearchParams()
@@ -17,34 +16,12 @@ export default function VideoScreen() {
   const [relatedVideos, setRelatedVideos] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('info')
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const scrollY = useRef(new Animated.Value(0)).current
-  const { width, height } = Dimensions.get('window')
+  const { width } = Dimensions.get('window')
 
   useEffect(() => {
     loadVideoData()
-    
-    // Set initial orientation to portrait
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT)
-    
-    // Listen for orientation changes
-    const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      const isPortraitMode = window.width < window.height
-      if (!isPortraitMode && !isFullscreen) {
-        // If device is in landscape but not in fullscreen mode, update state
-        setIsFullscreen(true)
-      } else if (isPortraitMode && isFullscreen) {
-        // If device is in portrait but in fullscreen mode, update state
-        setIsFullscreen(false)
-      }
-    })
-    
-    return () => {
-      subscription.remove()
-      // Reset orientation to portrait when component unmounts
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT)
-    }
-  }, [isFullscreen])
+  }, [params.id])
 
   const loadVideoData = async () => {
     try {
@@ -82,8 +59,6 @@ export default function VideoScreen() {
   })
 
   const renderHeader = () => {
-    if (isFullscreen) return null
-    
     return (
       <Animated.View style={[
         styles.header,
@@ -110,8 +85,6 @@ export default function VideoScreen() {
   }
 
   const renderTabs = () => {
-    if (isFullscreen) return null
-    
     return (
       <View style={styles.tabsContainer}>
         <TouchableOpacity 
@@ -140,8 +113,6 @@ export default function VideoScreen() {
   }
 
   const renderInfoContent = () => {
-    if (isFullscreen) return null
-    
     return (
       <View style={styles.infoContainer}>
         <View style={styles.titleRow}>
@@ -165,7 +136,7 @@ export default function VideoScreen() {
             <Text style={styles.subscribeText}>Subscribe</Text>
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>24.5K</Text>
@@ -187,18 +158,18 @@ export default function VideoScreen() {
           <TouchableOpacity style={styles.actionButton}>
             <FontAwesome5 name="thumbs-up" size={16} color="#FFF" />
             <Text style={styles.actionText}>Like</Text>
-          </TouchableOpacity>
+              </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
             <FontAwesome5 name="thumbs-down" size={16} color="#FFF" />
             <Text style={styles.actionText}>Dislike</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
             <FontAwesome5 name="share" size={16} color="#FFF" />
-            <Text style={styles.actionText}>Share</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
+                <Text style={styles.actionText}>Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
             <FontAwesome5 name="download" size={16} color="#FFF" />
-            <Text style={styles.actionText}>Download</Text>
+                <Text style={styles.actionText}>Download</Text>
           </TouchableOpacity>
         </View>
         
@@ -211,8 +182,6 @@ export default function VideoScreen() {
   }
 
   const renderRelatedContent = () => {
-    if (isFullscreen) return null
-    
     return (
       <View style={styles.relatedContainer}>
         <Text style={styles.sectionTitle}>Related Videos</Text>
@@ -229,8 +198,6 @@ export default function VideoScreen() {
   }
 
   const renderCommentsContent = () => {
-    if (isFullscreen) return null
-    
     return (
       <View style={styles.commentsContainer}>
         <View style={styles.commentInputContainer}>
@@ -264,21 +231,21 @@ export default function VideoScreen() {
         <View style={styles.commentItem}>
           <View style={styles.commentAvatar}>
             <Text style={styles.userInitial}>S</Text>
-          </View>
-          <View style={styles.commentContent}>
+            </View>
+                    <View style={styles.commentContent}>
             <Text style={styles.commentUsername}>Sarah Smith</Text>
             <Text style={styles.commentText}>I've been looking for this information for a long time. Great explanation!</Text>
-            <View style={styles.commentActions}>
+                      <View style={styles.commentActions}>
               <Text style={styles.commentTime}>1 week ago</Text>
               <TouchableOpacity>
                 <Text style={styles.commentAction}>Reply</Text>
-              </TouchableOpacity>
+                        </TouchableOpacity>
               <TouchableOpacity>
                 <Text style={styles.commentAction}>Like</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
       </View>
     )
   }
@@ -287,7 +254,7 @@ export default function VideoScreen() {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#00E0FF" />
-      </View>
+                </View>
     )
   }
 
@@ -295,17 +262,12 @@ export default function VideoScreen() {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>Video not found</Text>
-      </View>
+              </View>
     )
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar 
-        barStyle={isFullscreen ? "light-content" : "dark-content"} 
-        backgroundColor={isFullscreen ? "#000" : "#001E3C"}
-        hidden={isFullscreen}
-      />
       {renderHeader()}
       <Animated.ScrollView 
         showsVerticalScrollIndicator={false}
@@ -314,7 +276,6 @@ export default function VideoScreen() {
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
-        scrollEnabled={!isFullscreen}
       >
         <VideoPlayer
           videoUrl={video.videoUrl}

@@ -1,13 +1,11 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from "react"
+import type React from "react"
+import { useState, useRef, useEffect } from "react"
 import { View, StyleSheet, Dimensions, ActivityIndicator, Text, TouchableOpacity, ViewStyle, TextStyle, Platform, StatusBar } from "react-native"
 import YoutubeIframe from "react-native-youtube-iframe"
 import { Ionicons } from "@expo/vector-icons"
 import * as ScreenOrientation from 'expo-screen-orientation'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { FontAwesome5 } from '@expo/vector-icons'
-import { BlurView } from 'expo-blur'
 
 interface VideoPlayerProps {
   videoUrl: string
@@ -29,13 +27,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onProgress,
   onComplete,
 }) => {
-  const [isPlaying, setIsPlaying] = useState(autoPlay)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [videoId, setVideoId] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isPortrait, setIsPortrait] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const playerRef = useRef(null)
-  const insets = useSafeAreaInsets()
   const { width, height } = Dimensions.get('window')
 
   // Extract YouTube video ID from URL
@@ -61,6 +58,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         if (id) {
           console.log("Extracted video ID:", id)
+          setVideoId(id)
         } else {
           setError("Could not extract video ID from URL")
         }
@@ -74,62 +72,45 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Handle orientation changes
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      const isPortraitMode = window.width < window.height
-      setIsPortrait(isPortraitMode)
+      const isPortraitMode = window.width < window.height;
+      setIsPortrait(isPortraitMode);
       
-      if (!isPortraitMode && !isFullscreen) {
-        // If device is in landscape but not in fullscreen mode, update state
-        setIsFullscreen(true)
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
-      } else if (isPortraitMode && isFullscreen) {
-        // If device is in portrait but in fullscreen mode, update state
-        setIsFullscreen(false)
-        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT)
+      if (isFullscreen && !isPortraitMode) {
+        // In landscape and fullscreen, lock to landscape
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      } else if (isFullscreen && isPortraitMode) {
+        // In portrait and fullscreen, unlock to allow rotation
+        ScreenOrientation.unlockAsync();
       }
-    })
+    });
 
     return () => {
-      subscription.remove()
-      // Reset orientation to portrait when component unmounts
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT)
+      subscription.remove();
+    };
+  }, [isFullscreen]);
+
+  // Handle fullscreen toggle
+  const toggleFullscreen = async () => {
+    if (isFullscreen) {
+      // Exit fullscreen
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
+      setIsFullscreen(false);
+    } else {
+      // Enter fullscreen
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      setIsFullscreen(true);
     }
-  }, [isFullscreen])
+  };
 
   // Handle state changes
   const onStateChange = (state: string) => {
     console.log("Player state changed:", state)
     if (state === "ended") {
       onComplete?.()
-      setIsPlaying(false)
     } else if (state === "playing") {
       setIsLoading(false)
     }
   }
-
-  const handlePlayPause = () => {
-    setIsPlaying(!isPlaying)
-  }
-
-  const handleFullscreenToggle = () => {
-    if (isFullscreen) {
-      setIsFullscreen(false)
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT)
-    } else {
-      setIsFullscreen(true)
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
-    }
-  }
-
-  const handleError = (error: string) => {
-    console.error('Video player error:', error)
-    setError(error)
-  }
-
-  const handleReady = () => {
-    setIsLoading(false)
-  }
-
-  const playerHeight = isFullscreen ? height : width * 0.5625 // 16:9 aspect ratio
 
   if (error) {
     return (
@@ -154,8 +135,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 }
 
                 if (id) {
-                  // Re-attempt to load the video
-                  setIsLoading(true)
+                  setVideoId(id)
                 } else {
                   setError("Could not extract video ID from URL")
                 }
@@ -167,6 +147,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         >
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
+      </View>
+    )
+  }
+
+  if (!videoId) {
+    return (
+      <View style={[styles.loadingContainer, style]}>
+        <ActivityIndicator size="large" color="#00E0FF" />
+        <Text style={styles.loadingText}>Loading video...</Text>
       </View>
     )
   }
@@ -192,20 +181,43 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ]}>
         <YoutubeIframe
           ref={playerRef}
-          height={playerHeight}
-          width={isFullscreen ? width : width}
-          videoId={videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop()}
-          play={isPlaying}
+          height={isFullscreen ? height : 220}
+          width={isFullscreen ? width : +(Dimensions.get("window").width)}
+          videoId={videoId}
+          play={autoPlay}
           onChangeState={onStateChange}
-          onReady={handleReady}
-          onError={handleError}
+          onReady={() => {
+            console.log("Player ready")
+            setIsLoading(false)
+          }}
+          onError={(error) => {
+            console.error("Player error:", error)
+            setError(`Failed to load video: ${error}`)
+          }}
           initialPlayerParams={{
             modestbranding: true,
             rel: false,
             controls: false
           }}
           webViewProps={{
-            allowsFullscreenVideo: false,
+            allowsInlineMediaPlayback: true,
+            mediaPlaybackRequiresUserAction: false,
+            javaScriptEnabled: true,
+            domStorageEnabled: true,
+            startInLoadingState: true,
+            onShouldStartLoadWithRequest: () => true,
+            onLoadEnd: () => {
+              console.log("WebView loaded")
+              setIsLoading(false)
+            },
+            androidLayerType: 'hardware',
+            mixedContentMode: 'always',
+            allowFileAccess: true,
+            allowUniversalAccessFromFileURLs: true,
+            style: {
+              backgroundColor: 'transparent',
+              opacity: 1
+            } as ViewStyle
           }}
         />
         {isLoading && (
@@ -214,19 +226,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </View>
         )}
         
-        {!isFullscreen && (
-          <BlurView intensity={80} style={styles.controlsContainer}>
-            <View style={styles.controlsRow}>
-              <TouchableOpacity style={styles.controlButton} onPress={handlePlayPause}>
-                <FontAwesome5 name={isPlaying ? 'pause' : 'play'} size={16} color="#FFF" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.controlButton} onPress={handleFullscreenToggle}>
-                <FontAwesome5 name="expand" size={16} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-          </BlurView>
-        )}
+        <TouchableOpacity 
+          style={styles.fullscreenButton}
+          onPress={toggleFullscreen}
+        >
+          <Ionicons 
+            name={isFullscreen ? "contract" : "expand"} 
+            size={24} 
+            color="#FFF" 
+          />
+        </TouchableOpacity>
       </View>
     </View>
   )
@@ -250,8 +259,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 0,
     zIndex: 999,
+    borderRadius: 0,
   } as ViewStyle,
   playerContainer: {
     width: "100%",
@@ -262,9 +271,9 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255, 255, 255, 0.1)",
   } as ViewStyle,
   fullscreenPlayer: {
-    width: '100%',
-    height: '100%',
     aspectRatio: undefined,
+    height: '100%',
+    width: '100%',
   } as ViewStyle,
   titleContainer: {
     padding: 16,
@@ -334,26 +343,18 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     backdropFilter: "blur(4px)",
   } as ViewStyle,
-  controlsContainer: {
+  fullscreenButton: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 15,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  controlButton: {
+    bottom: 16,
+    right: 16,
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
+    zIndex: 10,
+  } as ViewStyle,
 })
 
 export default VideoPlayer
