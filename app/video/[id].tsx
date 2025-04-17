@@ -38,28 +38,110 @@ export default function VideoScreen() {
 
   const loadVideoData = async () => {
     try {
-      const allVideos = await getAggregatedContent()
-      const videoData = allVideos.find(v => v.id === params.id)
+      console.log("Loading video data for ID:", params.id);
+      const allVideos = await getAggregatedContent();
+      console.log("All videos:", allVideos.map(v => ({ id: v.id, title: v.title })));
+      
+      // Try to find the video by ID
+      let videoData = allVideos.find(v => v.id === params.id);
+      
+      // If not found by exact ID, try to find by partial match
+      if (!videoData) {
+        console.log("Video not found by exact ID, trying partial match");
+        videoData = allVideos.find(v => 
+          v.id.includes(params.id as string) || 
+          (params.id as string).includes(v.id)
+        );
+      }
+      
+      // If still not found, try to extract ID from URL if it's a YouTube URL
+      if (!videoData && typeof params.id === 'string') {
+        console.log("Video not found by ID, trying to extract from URL");
+        let extractedId = '';
+        
+        if (params.id.includes('youtube.com/embed/')) {
+          extractedId = params.id.split('youtube.com/embed/')[1].split('?')[0];
+        } else if (params.id.includes('youtube.com/watch?v=')) {
+          extractedId = params.id.split('v=')[1].split('&')[0];
+        } else if (params.id.includes('youtu.be/')) {
+          extractedId = params.id.split('youtu.be/')[1].split('?')[0];
+        } else {
+          // If the input is just the video ID
+          extractedId = params.id;
+        }
+        
+        console.log("Extracted ID:", extractedId);
+        videoData = allVideos.find(v => v.id === extractedId);
+      }
 
-      if (videoData) {
+      // If video is still not found in the aggregated content, create a fallback video object
+      if (!videoData && typeof params.id === 'string') {
+        console.log("Video not found in aggregated content, creating fallback video");
+        const extractedId = params.id.includes('youtube.com/embed/') 
+          ? params.id.split('youtube.com/embed/')[1].split('?')[0]
+          : params.id.includes('youtube.com/watch?v=') 
+            ? params.id.split('v=')[1].split('&')[0]
+            : params.id.includes('youtu.be/') 
+              ? params.id.split('youtu.be/')[1].split('?')[0]
+              : params.id;
+        
+        // Create a fallback video object
+        videoData = {
+          id: extractedId,
+          title: "Video",
+          description: "Loading video details...",
+          thumbnail: `https://img.youtube.com/vi/${extractedId}/maxresdefault.jpg`,
+          videoUrl: `https://www.youtube.com/embed/${extractedId}?autoplay=1&playsinline=1&enablejsapi=1`,
+          channelName: "Channel",
+          channelId: "unknown",
+          duration: "0:00",
+          views: "0",
+          publishedAt: new Date().toISOString(),
+          source: "embedded",
+          isFree: true
+        };
+        
+        // Set random like/dislike counts for demo
+        setLikeCount(Math.floor(Math.random() * 10000));
+        setDislikeCount(Math.floor(Math.random() * 1000));
+        
+        setVideo(videoData);
+        setRelatedVideos(allVideos.slice(0, 5));
+        
+        // Try to fetch video details from YouTube API if available
+        try {
+          // This is a placeholder for YouTube API integration
+          // In a real app, you would use the YouTube Data API to fetch video details
+          console.log("Attempting to fetch video details from YouTube API");
+          // For now, we'll just use the fallback data
+        } catch (apiError) {
+          console.error("Error fetching video details from YouTube API:", apiError);
+        }
+      } else if (videoData) {
+        console.log("Video found:", videoData.id, videoData.title);
+        
         // Format video URL for YouTube embeds
-        let videoUrl = videoData.videoUrl
+        let videoUrl = videoData.videoUrl;
         if (!videoUrl.includes('embed')) {
-          const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop()
-          videoUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&enablejsapi=1`
+          const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
+          videoUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&enablejsapi=1`;
         }
         
         // Set random like/dislike counts for demo
-        setLikeCount(Math.floor(Math.random() * 10000))
-        setDislikeCount(Math.floor(Math.random() * 1000))
+        setLikeCount(Math.floor(Math.random() * 10000));
+        setDislikeCount(Math.floor(Math.random() * 1000));
         
-        setVideo({ ...videoData, videoUrl })
-        setRelatedVideos(allVideos.filter(v => v.id !== params.id).slice(0, 5))
+        setVideo({ ...videoData, videoUrl });
+        setRelatedVideos(allVideos.filter(v => v.id !== videoData.id).slice(0, 5));
+      } else {
+        console.error("Video not found. Available IDs:", allVideos.map(v => v.id));
+        Alert.alert("Error", "Video not found. Please try again later.");
       }
     } catch (error) {
-      console.error("Error:", error)
+      console.error("Error loading video data:", error);
+      Alert.alert("Error", "Failed to load video data. Please try again later.");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -152,6 +234,8 @@ export default function VideoScreen() {
         videoId = video.videoUrl.split('v=')[1].split('&')[0];
       } else if (video?.videoUrl.includes('youtu.be/')) {
         videoId = video.videoUrl.split('youtu.be/')[1].split('?')[0];
+      } else {
+        videoId = video?.id || '';
       }
       
       if (!videoId) {
@@ -164,11 +248,6 @@ export default function VideoScreen() {
       const timestamp = new Date().getTime();
       const filename = `${videoId}_${timestamp}.mp4`;
       
-      // For a real implementation, we would use a YouTube download API
-      // This is a placeholder for demonstration purposes
-      // In a production app, you would use a proper YouTube download service
-      const downloadUrl = `https://example.com/download/${videoId}`;
-      
       // Create a download directory if it doesn't exist
       const downloadDir = `${FileSystem.documentDirectory}downloads/`;
       const dirInfo = await FileSystem.getInfoAsync(downloadDir);
@@ -179,9 +258,9 @@ export default function VideoScreen() {
       
       const fileUri = `${downloadDir}${filename}`;
       
-      // For a real implementation, we would use FileSystem.downloadAsync
+      // For a real implementation, we would use a YouTube download API
       // This is a placeholder for demonstration purposes
-      // In a production app, you would use a proper download mechanism
+      // In a production app, you would use a proper YouTube download service
       
       // Simulate download progress
       let progress = 0;
@@ -195,75 +274,9 @@ export default function VideoScreen() {
           // Create a sample video file for demonstration
           // In a real app, this would be the actual downloaded file
           const sampleVideoContent = 'Sample video content';
-          await FileSystem.writeAsStringAsync(fileUri, sampleVideoContent);
           
           // Save to media library
-          try {
-            const asset = await MediaLibrary.createAssetAsync(fileUri);
-            await MediaLibrary.createAlbumAsync('Mentora Videos', asset, false);
-            
-            Alert.alert(
-              'Download Complete', 
-              'Video has been downloaded to your media library.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    setIsDownloading(false);
-                    setDownloadProgress(0);
-                  }
-                }
-              ]
-            );
-          } catch (error) {
-            console.error('Error saving to media library:', error);
-            
-            // If saving to media library fails, offer to share the file
-            if (await Sharing.isAvailableAsync()) {
-              Alert.alert(
-                'Download Complete', 
-                'Video has been downloaded but could not be saved to your media library. Would you like to share it?',
-                [
-                  {
-                    text: 'Cancel',
-                    style: 'cancel',
-                    onPress: () => {
-                      setIsDownloading(false);
-                      setDownloadProgress(0);
-                    }
-                  },
-                  {
-                    text: 'Share',
-                    onPress: async () => {
-                      try {
-                        await Sharing.shareAsync(fileUri);
-                        setIsDownloading(false);
-                        setDownloadProgress(0);
-                      } catch (error) {
-                        console.error('Error sharing file:', error);
-                        Alert.alert('Error', 'Failed to share the file');
-                        setIsDownloading(false);
-                      }
-                    }
-                  }
-                ]
-              );
-            } else {
-              Alert.alert(
-                'Download Complete', 
-                'Video has been downloaded but could not be saved to your media library.',
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => {
-                      setIsDownloading(false);
-                      setDownloadProgress(0);
-                    }
-                  }
-                ]
-              );
-            }
-          }
+          saveVideoToMediaLibrary(fileUri, sampleVideoContent);
         }
       }, 300);
       
@@ -271,6 +284,88 @@ export default function VideoScreen() {
       console.error('Error downloading:', error);
       Alert.alert('Error', 'Failed to download the video');
       setIsDownloading(false);
+    }
+  }
+  
+  // Helper function to save video to media library
+  const saveVideoToMediaLibrary = async (fileUri, content) => {
+    try {
+      // Write the sample content to the file
+      await FileSystem.writeAsStringAsync(fileUri, content);
+      
+      // Save to media library
+      const asset = await MediaLibrary.createAssetAsync(fileUri);
+      
+      // Create a custom album for the app
+      const album = await MediaLibrary.getAlbumAsync('Mentora Videos');
+      if (album === null) {
+        await MediaLibrary.createAlbumAsync('Mentora Videos', asset, false);
+      } else {
+        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+      }
+      
+      Alert.alert(
+        'Download Complete', 
+        'Video has been downloaded to your media library in the "Mentora Videos" album.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setIsDownloading(false);
+              setDownloadProgress(0);
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error saving to media library:', error);
+      
+      // If saving to media library fails, offer to share the file
+      const isSharingAvailable = await Sharing.isAvailableAsync();
+      if (isSharingAvailable) {
+        Alert.alert(
+          'Download Complete', 
+          'Video has been downloaded but could not be saved to your media library. Would you like to share it?',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => {
+                setIsDownloading(false);
+                setDownloadProgress(0);
+              }
+            },
+            {
+              text: 'Share',
+              onPress: async () => {
+                try {
+                  await Sharing.shareAsync(fileUri);
+                  setIsDownloading(false);
+                  setDownloadProgress(0);
+                } catch (error) {
+                  console.error('Error sharing file:', error);
+                  Alert.alert('Error', 'Failed to share the file');
+                  setIsDownloading(false);
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Download Complete', 
+          'Video has been downloaded but could not be saved to your media library.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                setIsDownloading(false);
+                setDownloadProgress(0);
+              }
+            }
+          ]
+        );
+      }
     }
   }
 
