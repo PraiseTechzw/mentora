@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react"
 import { StyleSheet, View, Text, ScrollView, ActivityIndicator } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
@@ -28,7 +27,7 @@ export default function VideoScreen() {
         let videoUrl = videoData.videoUrl
         if (!videoUrl.includes('embed')) {
           const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop()
-          videoUrl = `https://www.youtube.com/embed/${videoId}?playsinline=1`
+          videoUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&enablejsapi=1`
         }
         
         setVideo({ ...videoData, videoUrl })

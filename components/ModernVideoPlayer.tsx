@@ -13,7 +13,6 @@ interface VideoPlayerProps {
   channelName?: string
   style?: ViewStyle
   autoPlay?: boolean
-  showControlsInitially?: boolean
   onProgress?: (progress: number) => void
   onComplete?: () => void
 }
@@ -24,15 +23,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   channelName,
   style,
   autoPlay = false,
-  showControlsInitially = true,
   onProgress,
   onComplete,
 }) => {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [videoId, setVideoId] = useState<string | null>(null)
-  const [playing, setPlaying] = useState(autoPlay)
-  const [currentTime, setCurrentTime] = useState(0)
   const playerRef = useRef(null)
 
   // Extract YouTube video ID from URL
@@ -69,44 +65,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [videoUrl])
 
-  // Handle progress updates
+  // Handle state changes
   const onStateChange = (state: string) => {
     console.log("Player state changed:", state)
     if (state === "ended") {
-      setPlaying(false)
       onComplete?.()
     } else if (state === "playing") {
       setIsLoading(false)
-    } else if (state === "paused") {
-      setPlaying(false)
     }
   }
-
-  // Track video progress
-  useEffect(() => {
-    let progressInterval: NodeJS.Timeout | null = null
-
-    if (playing && playerRef.current && onProgress) {
-      progressInterval = setInterval(async () => {
-        try {
-          // @ts-ignore - getCurrentTime exists on the ref but TypeScript doesn't know about it
-          const currentTime = await playerRef.current?.getCurrentTime()
-          if (currentTime) {
-            setCurrentTime(currentTime)
-            onProgress(currentTime)
-          }
-        } catch (e) {
-          console.error("Error getting current time:", e)
-        }
-      }, 1000)
-    }
-
-    return () => {
-      if (progressInterval) {
-        clearInterval(progressInterval)
-      }
-    }
-  }, [playing, onProgress])
 
   if (error) {
     return (
@@ -156,8 +123,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     )
   }
 
-  const screenWidth: number = Dimensions.get("window").width;
-
   return (
     <View style={[styles.container, style]}>
       {title && (
@@ -175,14 +140,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           height={220}
           width={+(Dimensions.get("window").width)}
           videoId={videoId}
-          play={playing}
+          play={autoPlay}
           onChangeState={onStateChange}
           onReady={() => {
             console.log("Player ready")
             setIsLoading(false)
-            if (autoPlay) {
-              setPlaying(true)
-            }
           }}
           onError={(error) => {
             console.error("Player error:", error)
@@ -191,9 +153,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           initialPlayerParams={{
             modestbranding: true,
             rel: false,
-            controls: true,
-            enablejsapi: true,
-            origin: "https://www.youtube.com"
+            controls: false
           }}
           webViewProps={{
             allowsInlineMediaPlayback: true,
