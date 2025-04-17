@@ -105,23 +105,12 @@ export default function VideoScreen() {
       // Ensure videoUrl is properly formatted
       let videoUrl = videoData.videoUrl;
       if (videoData.source === 'embedded') {
-        // Convert YouTube URLs to embed format if needed
-        if (!videoUrl.includes('embed')) {
+        // For YouTube videos, we'll use a direct video URL if possible
+        if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
           const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
-          // Use the most compatible embed URL format
-          videoUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1&enablejsapi=1&modestbranding=1&rel=0&showinfo=0&controls=1&fs=1`;
-        } else {
-          // Add necessary parameters to existing embed URL
-          const url = new URL(videoUrl);
-          url.searchParams.set('autoplay', '1');
-          url.searchParams.set('playsinline', '1');
-          url.searchParams.set('enablejsapi', '1');
-          url.searchParams.set('modestbranding', '1');
-          url.searchParams.set('rel', '0');
-          url.searchParams.set('showinfo', '0');
-          url.searchParams.set('controls', '1');
-          url.searchParams.set('fs', '1');
-          videoUrl = url.toString();
+          // Use a direct video URL format that works better in React Native
+          // This is a fallback approach - if this doesn't work, we'll need to use a different method
+          videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         }
       }
 
