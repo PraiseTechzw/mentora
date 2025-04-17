@@ -33,7 +33,7 @@ import { ModernVideoCard } from "../../components/ModernVideoCard"
 import { addToWatchHistory } from "../../services/content-service"
 import type { AggregatedVideo } from "../../types/videoag"
 import { getAggregatedContent } from "../../services/content-aggregator"
-import { VideoPlayer } from "../../components/ModernVideoPlayer"
+import VideoPlayer from "../../components/ModernVideoPlayer"
 
 interface Comment {
   id: string

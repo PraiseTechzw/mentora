@@ -2,15 +2,21 @@
 
 import React, { useState, useRef } from 'react';
 import { View, StyleSheet, Dimensions, ActivityIndicator, Text } from 'react-native';
-import YoutubeIframe, { PLAYER_STATES } from 'react-native-youtube-iframe';
+import YoutubeIframe from 'react-native-youtube-iframe';
 
 interface VideoPlayerProps {
   videoUrl: string;
+  thumbnailUrl?: string;
+  title?: string;
+  channelName?: string;
   style?: any;
   autoPlay?: boolean;
+  showControlsInitially?: boolean;
+  onProgress?: (progress: number) => void;
+  onComplete?: () => void;
 }
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({
+const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoUrl,
   style,
   autoPlay = false,
@@ -78,7 +84,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         play={autoPlay}
         onChangeState={(state) => {
           console.log('Player state changed:', state);
-          if (state === PLAYER_STATES.ENDED) {
+          if (state === 'ended') {
             setIsLoading(false);
           }
         }}
@@ -147,3 +153,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });
+
+export default VideoPlayer;
