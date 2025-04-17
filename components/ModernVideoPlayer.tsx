@@ -96,14 +96,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setError(`Failed to load video: ${error}`);
         }}
         initialPlayerParams={{
-          preventFullScreen: false,
           modestbranding: true,
           rel: false,
-          controls: true,
+          controls: true
         }}
         webViewProps={{
           allowsInlineMediaPlayback: true,
           mediaPlaybackRequiresUserAction: false,
+          javaScriptEnabled: true,
+          domStorageEnabled: true,
         }}
       />
       {isLoading && (
