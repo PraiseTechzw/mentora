@@ -20,11 +20,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoUrl,
   style,
   autoPlay = false,
+  onProgress,
+  onComplete,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [videoId, setVideoId] = useState<string | null>(null);
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef(null);
 
   // Extract YouTube video ID from URL
   React.useEffect(() => {
@@ -34,13 +36,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         let id = '';
         
         if (videoUrl.includes('youtube.com/embed/')) {
-          // Extract from embed URL
           id = videoUrl.split('youtube.com/embed/')[1].split('?')[0];
         } else if (videoUrl.includes('youtube.com/watch?v=')) {
-          // Extract from watch URL
           id = videoUrl.split('v=')[1].split('&')[0];
         } else if (videoUrl.includes('youtu.be/')) {
-          // Extract from short URL
           id = videoUrl.split('youtu.be/')[1].split('?')[0];
         }
         
@@ -77,7 +76,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   return (
     <View style={[styles.container, style]}>
       <YoutubeIframe
-        ref={playerRef}
         height={220}
         width={Dimensions.get('window').width}
         videoId={videoId}
@@ -86,6 +84,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           console.log('Player state changed:', state);
           if (state === 'ended') {
             setIsLoading(false);
+            onComplete?.();
           }
         }}
         onReady={() => {
@@ -97,6 +96,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setError(`Failed to load video: ${error}`);
         }}
         initialPlayerParams={{
+          preventFullScreen: false,
           modestbranding: true,
           rel: false,
           controls: true,
