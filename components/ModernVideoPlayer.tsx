@@ -202,9 +202,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           initialPlayerParams={{
             modestbranding: true,
             rel: false,
-            controls: false,
-            playsinline: 1,
-            enablejsapi: 1
+            controls: false
           }}
           webViewProps={{
             allowsFullscreenVideo: false,
