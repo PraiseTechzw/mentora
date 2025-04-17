@@ -8,6 +8,8 @@ import { LinearGradient } from "expo-linear-gradient"
 import { BlurView } from "expo-blur"
 import * as ImagePicker from "expo-image-picker"
 import { useUser } from "../../contexts/UserContext"
+import { useSettings } from "../../contexts/SettingsContext"
+import { getUserData } from "../../services/user-service"
 
 // Mock data for achievements and other UI elements
 const ACHIEVEMENTS = [
@@ -31,14 +33,26 @@ const INTERESTS = ["Web Development", "Mobile Apps", "Data Science", "UI/UX Desi
 export default function ProfileScreen() {
   const router = useRouter()
   const { user, profile, isLoading: userLoading, signOut, uploadAvatar, updateProfile } = useUser()
+  const { settings, updateSetting } = useSettings()
   const scrollY = useRef(new Animated.Value(0)).current
   const [refreshing, setRefreshing] = useState(false)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false)
-  const [downloadOverWifiOnly, setDownloadOverWifiOnly] = useState(true)
   const [showAllAchievements, setShowAllAchievements] = useState(false)
   const [showAllActivity, setShowAllActivity] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [userData, setUserData] = useState(null)
+
+  useEffect(() => {
+    loadUserData()
+  }, [])
+
+  const loadUserData = async () => {
+    try {
+      const data = await getUserData()
+      setUserData(data)
+    } catch (error) {
+      console.error("Error loading user data:", error)
+    }
+  }
 
   const headerHeight = scrollY.interpolate({
     inputRange: [0, 200],
@@ -52,12 +66,15 @@ export default function ProfileScreen() {
     extrapolate: 'clamp',
   })
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true)
-    // Simulate data refresh
-    setTimeout(() => {
+    try {
+      await loadUserData()
+    } catch (error) {
+      console.error("Error refreshing data:", error)
+    } finally {
       setRefreshing(false)
-    }, 2000)
+    }
   }, [])
 
   const handleEditProfile = () => {
@@ -124,47 +141,76 @@ export default function ProfileScreen() {
   const renderHeader = () => (
     <Animated.View style={[styles.header, { height: headerHeight, opacity: headerOpacity }]}>
       <LinearGradient
-        colors={['#FF6B6B', '#FF8E8E']}
+        colors={["#4A90E2", "#357ABD"]}
         style={styles.headerGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
-        <View style={styles.avatarContainer}>
-          {userLoading ? (
-            <ActivityIndicator size="large" color="#FFF" />
-          ) : (
-            <>
-          <Image
-                source={profile?.avatar_url || "https://randomuser.me/api/portraits/men/32.jpg"}
-            style={styles.profileImage}
-            contentFit="cover"
-          />
-              <TouchableOpacity 
-                style={styles.changeAvatarButton} 
-                onPress={handleChangeAvatar}
-                disabled={isUploading}
-              >
-                {isUploading ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Ionicons name="camera" size={16} color="#FFF" />
-                )}
+        <View style={styles.headerContent}>
+          <View style={styles.avatarContainer}>
+            <Image
+              source={{ uri: profile?.avatar_url || "https://ui-avatars.com/api/?name=" + encodeURIComponent(profile?.name || "User") }}
+              style={styles.avatar}
+              contentFit="cover"
+            />
+            {isUploading ? (
+              <View style={styles.uploadingOverlay}>
+                <ActivityIndicator color="#FFF" />
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.changeAvatarButton} onPress={handleChangeAvatar}>
+                <Ionicons name="camera" size={20} color="#FFF" />
               </TouchableOpacity>
-            </>
-          )}
+            )}
+          </View>
+          <Text style={styles.userName}>{profile?.name || "User"}</Text>
+          <Text style={styles.userEmail}>{profile?.email || ""}</Text>
+          <TouchableOpacity style={styles.editProfileButton} onPress={handleEditProfile}>
+            <Text style={styles.editProfileText}>Edit Profile</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.name}>{profile?.name || "User"}</Text>
-        <Text style={styles.email}>{profile?.email || user?.email || ""}</Text>
       </LinearGradient>
     </Animated.View>
+  )
+
+  const renderUserStats = () => (
+    <View style={styles.userStatsContainer}>
+      <LinearGradient
+        colors={["#4A90E2", "#357ABD"]}
+        style={styles.userStatsGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.statsGrid}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{userData?.points || 0}</Text>
+            <Text style={styles.statLabel}>Points Earned</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{userData?.streak || 0}</Text>
+            <Text style={styles.statLabel}>Day Streak</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{userData?.bookmarkedVideos?.length || 0}</Text>
+            <Text style={styles.statLabel}>Saved Videos</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{userData?.preferences?.length || 0}</Text>
+            <Text style={styles.statLabel}>Interests</Text>
+          </View>
+        </View>
+      </LinearGradient>
+    </View>
   )
 
   const renderLevelProgress = () => (
     <View style={styles.levelContainer}>
       <View style={styles.levelInfo}>
-        <Text style={styles.levelText}>Level 5</Text>
-        <Text style={styles.xpText}>1250 / 2000 XP</Text>
+        <Text style={styles.levelText}>Level {Math.floor((userData?.points || 0) / 100) + 1}</Text>
+        <Text style={styles.xpText}>{userData?.points || 0} / {(Math.floor((userData?.points || 0) / 100) + 1) * 100} XP</Text>
       </View>
       <View style={styles.progressBarContainer}>
-        <View style={[styles.progressBar, { width: '62.5%' }]} />
+        <View style={[styles.progressBar, { width: `${((userData?.points || 0) % 100)}%` }]} />
       </View>
     </View>
   )
@@ -172,63 +218,18 @@ export default function ProfileScreen() {
   const renderLearningProgress = () => (
     <View style={styles.progressContainer}>
       <View style={styles.progressItem}>
-        <Text style={styles.progressValue}>24</Text>
-        <Text style={styles.progressLabel}>Courses</Text>
+        <Text style={styles.progressValue}>{userData?.bookmarkedVideos?.length || 0}</Text>
+        <Text style={styles.progressLabel}>Videos</Text>
       </View>
       <View style={styles.progressDivider} />
       <View style={styles.progressItem}>
-        <Text style={styles.progressValue}>156</Text>
-        <Text style={styles.progressLabel}>Hours</Text>
+        <Text style={styles.progressValue}>{userData?.streak || 0}</Text>
+        <Text style={styles.progressLabel}>Days</Text>
       </View>
       <View style={styles.progressDivider} />
       <View style={styles.progressItem}>
-        <Text style={styles.progressValue}>12</Text>
-        <Text style={styles.progressLabel}>Certificates</Text>
-      </View>
-            </View>
-  )
-
-  const renderAchievements = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Achievements</Text>
-        <TouchableOpacity onPress={() => setShowAllAchievements(!showAllAchievements)}>
-          <Text style={styles.seeAllText}>{showAllAchievements ? "Show Less" : "See All"}</Text>
-        </TouchableOpacity>
-            </View>
-      <View style={styles.achievementsContainer}>
-        {ACHIEVEMENTS.slice(0, showAllAchievements ? ACHIEVEMENTS.length : 3).map((achievement) => (
-          <View key={achievement.id} style={styles.achievementItem}>
-            <View style={[styles.achievementIcon, { backgroundColor: achievement.color, opacity: achievement.unlocked ? 1 : 0.5 }]}>
-              <FontAwesome5 name={achievement.icon} size={16} color="#FFF" />
-            </View>
-            <Text style={[styles.achievementName, { opacity: achievement.unlocked ? 1 : 0.5 }]}>{achievement.name}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  )
-
-  const renderRecentActivity = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <TouchableOpacity onPress={() => setShowAllActivity(!showAllActivity)}>
-          <Text style={styles.seeAllText}>{showAllActivity ? "Show Less" : "See All"}</Text>
-          </TouchableOpacity>
-        </View>
-      <View style={styles.activityContainer}>
-        {RECENT_ACTIVITY.slice(0, showAllActivity ? RECENT_ACTIVITY.length : 3).map((activity) => (
-          <View key={activity.id} style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <FontAwesome5 name={activity.icon} size={16} color="#FF6B6B" />
-            </View>
-            <View style={styles.activityInfo}>
-              <Text style={styles.activityTitle}>{activity.title}</Text>
-              <Text style={styles.activityDate}>{activity.date}</Text>
-            </View>
-          </View>
-        ))}
+        <Text style={styles.progressValue}>{userData?.points || 0}</Text>
+        <Text style={styles.progressLabel}>Points</Text>
       </View>
     </View>
   )
@@ -237,26 +238,13 @@ export default function ProfileScreen() {
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Skills</Text>
       <View style={styles.skillsContainer}>
-        {SKILLS.map((skill, index) => (
+        {userData?.preferences?.map((skill, index) => (
           <View key={index} style={styles.skillItem}>
             <Text style={styles.skillText}>{skill}</Text>
           </View>
         ))}
-          </View>
-        </View>
-  )
-
-  const renderInterests = () => (
-        <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Interests</Text>
-      <View style={styles.interestsContainer}>
-        {INTERESTS.map((interest, index) => (
-          <View key={index} style={styles.interestItem}>
-            <Text style={styles.interestText}>{interest}</Text>
-          </View>
-        ))}
-              </View>
-            </View>
+      </View>
+    </View>
   )
 
   const renderSettings = () => (
@@ -267,34 +255,34 @@ export default function ProfileScreen() {
           <View style={styles.settingInfo}>
             <Ionicons name="notifications-outline" size={20} color="#666" />
             <Text style={styles.settingText}>Notifications</Text>
-              </View>
+          </View>
           <Switch
-            value={notificationsEnabled}
-            onValueChange={setNotificationsEnabled}
+            value={settings.notificationsEnabled}
+            onValueChange={(value) => updateSetting('notificationsEnabled', value)}
             trackColor={{ false: "#D1D1D6", true: "#FF6B6B" }}
             thumbColor="#FFF"
           />
-            </View>
+        </View>
         <View style={styles.settingItem}>
           <View style={styles.settingInfo}>
             <Ionicons name="moon-outline" size={20} color="#666" />
             <Text style={styles.settingText}>Dark Mode</Text>
-              </View>
+          </View>
           <Switch
-            value={darkModeEnabled}
-            onValueChange={setDarkModeEnabled}
+            value={settings.darkModeEnabled}
+            onValueChange={(value) => updateSetting('darkModeEnabled', value)}
             trackColor={{ false: "#D1D1D6", true: "#FF6B6B" }}
             thumbColor="#FFF"
           />
-            </View>
+        </View>
         <View style={styles.settingItem}>
           <View style={styles.settingInfo}>
             <Ionicons name="wifi-outline" size={20} color="#666" />
             <Text style={styles.settingText}>Download over Wi-Fi only</Text>
           </View>
           <Switch
-            value={downloadOverWifiOnly}
-            onValueChange={setDownloadOverWifiOnly}
+            value={settings.downloadOverWifiOnly}
+            onValueChange={(value) => updateSetting('downloadOverWifiOnly', value)}
             trackColor={{ false: "#D1D1D6", true: "#FF6B6B" }}
             thumbColor="#FFF"
           />
@@ -305,7 +293,7 @@ export default function ProfileScreen() {
             <Text style={styles.settingText}>Edit Profile</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#D1D1D6" />
-            </TouchableOpacity>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
           <View style={styles.settingInfo}>
             <Ionicons name="log-out-outline" size={20} color="#FF6B6B" />
@@ -331,15 +319,11 @@ export default function ProfileScreen() {
         }
       >
         {renderHeader()}
-        <View style={styles.content}>
-          {renderLevelProgress()}
-          {renderLearningProgress()}
-          {renderAchievements()}
-          {renderRecentActivity()}
-          {renderSkills()}
-          {renderInterests()}
-          {renderSettings()}
-        </View>
+        {renderUserStats()}
+        {renderLevelProgress()}
+        {renderLearningProgress()}
+        {renderSkills()}
+        {renderSettings()}
       </Animated.ScrollView>
     </SafeAreaView>
   )
@@ -364,16 +348,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingTop: 20,
   },
+  headerContent: {
+    alignItems: "center",
+  },
   avatarContainer: {
     position: "relative",
     marginBottom: 16,
   },
-  profileImage: {
+  avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
     borderColor: "#FFF",
+  },
+  uploadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 50,
+    alignItems: "center",
+    justifyContent: "center",
   },
   changeAvatarButton: {
     position: "absolute",
@@ -388,18 +386,71 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFF",
   },
-  name: {
+  userName: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#FFF",
     marginBottom: 4,
   },
-  email: {
+  userEmail: {
     fontSize: 14,
     color: "rgba(255,255,255,0.8)",
   },
-  content: {
-    padding: 16,
+  editProfileButton: {
+    backgroundColor: "#FFF",
+    padding: 12,
+    borderRadius: 16,
+    marginTop: 16,
+  },
+  editProfileText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#FF6B6B",
+  },
+  userStatsContainer: {
+    marginHorizontal: 16,
+    marginTop: -30,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  userStatsGradient: {
+    padding: 20,
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  statItem: {
+    width: "48%",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#FFF",
+    marginVertical: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#FFF",
+    opacity: 0.8,
   },
   levelContainer: {
     backgroundColor: "#FFF",

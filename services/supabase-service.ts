@@ -1,5 +1,4 @@
 import { supabase, Database } from './supabase-client';
-import type { YouTubeVideo } from './youtube-api';
 
 // User operations
 export async function getUserProfile(userId: string) {

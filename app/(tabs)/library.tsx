@@ -1,16 +1,18 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { StyleSheet, View, Text, FlatList, TouchableOpacity, RefreshControl, Dimensions, Animated, Platform, TextInput, Share } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { Image } from "expo-image"
 import { FontAwesome5, Ionicons, MaterialIcons } from "@expo/vector-icons"
-import { useRouter } from "expo-router"
+import { router } from "expo-router"
 import { LinearGradient } from "expo-linear-gradient"
 import { BlurView } from "expo-blur"
 import { SearchBar } from "../../components/SearchBar"
 import { ModernVideoCard } from "../../components/ModernVideoCard"
 import { getAggregatedContent, type AggregatedVideo } from "../../services/content-aggregator"
+import * as UserService from "../../services/user-service"
+import { getVideoDetails } from "../../services/content-aggregator"
 
 // Mock user data
 const USER = {
@@ -135,135 +137,119 @@ const WATCH_HISTORY = [
   },
 ]
 
-export default function LibraryScreen() {
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState("saved")
+const LibraryScreen = () => {
+  const [user, setUser] = useState(null)
+  const [watchHistory, setWatchHistory] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(null)
+  const [activeTab, setActiveTab] = useState("history")
   const [showDownloaded, setShowDownloaded] = useState(false)
-  const [videos, setVideos] = useState<AggregatedVideo[]>([])
 
-  // Load content when component mounts or when search/category changes
   useEffect(() => {
-    const loadContent = async () => {
-      setIsLoading(true)
-      try {
-        const content = await getAggregatedContent(searchQuery, selectedCategory)
-        setVideos(content)
-      } catch (error) {
-        console.error("Error loading content:", error)
-        setVideos([])
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    loadContent()
-  }, [searchQuery, selectedCategory])
+    loadData()
+  }, [])
 
-  const onRefresh = async () => {
-    setRefreshing(true)
+  const loadData = async () => {
     try {
-      const content = await getAggregatedContent()
-      setVideos(content)
+      setIsLoading(true)
+      const userData = await UserService.getUserData()
+      setUser(userData)
+
+      const completedVideos = userData.completedCourses || []
+      
+      // Fetch full video details for completed videos
+      const completedDetails = await Promise.all(
+        completedVideos.map(id => getVideoDetails(id))
+      )
+
+      setWatchHistory(completedDetails.filter(Boolean))
     } catch (error) {
-      console.error("Error refreshing content:", error)
+      console.error("Error loading library data:", error)
     } finally {
-      setRefreshing(false)
+      setIsLoading(false)
     }
   }
 
-  const handleShare = async (video: AggregatedVideo) => {
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await loadData()
+    setRefreshing(false)
+  }
+
+  const handleBookmarkToggle = async (videoId) => {
     try {
-      await Share.share({
-        message: `Check out this amazing video: ${video.title}`,
-        url: video.videoUrl,
-      })
+      if (watchHistory.some(course => course.id === videoId)) {
+        await UserService.removeBookmark(videoId)
+      } else {
+        await UserService.bookmarkVideo(videoId)
+      }
+      await loadData() // Refresh data
     } catch (error) {
-      console.error(error)
+      console.error("Error toggling bookmark:", error)
     }
+  }
+
+  const handleVideoPress = (videoId) => {
+    router.push(`/video/${videoId}`)
   }
 
   const renderUserStats = () => (
     <View style={styles.userStatsContainer}>
       <LinearGradient
-        colors={["#FF6B6B", "#FF8E8E"]}
+        colors={["#4A90E2", "#357ABD"]}
         style={styles.userStatsGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.userInfo}>
-          <Image source={USER.avatar} style={styles.userAvatar} contentFit="cover" />
+          <Image
+            source={{ uri: user?.avatar || "https://ui-avatars.com/api/?name=" + encodeURIComponent(user?.name || "User") }}
+            style={styles.userAvatar}
+            contentFit="cover"
+          />
           <View style={styles.userDetails}>
-            <Text style={styles.userName}>Hello, {USER.name}! 👋</Text>
-            <Text style={styles.userSubtitle}>Keep up the great work!</Text>
+            <Text style={styles.userName}>{user?.name || "User"}</Text>
+            <Text style={styles.userSubtitle}>{user?.email || ""}</Text>
           </View>
         </View>
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
-            <FontAwesome5 name="fire" size={20} color="#FFF" />
-            <Text style={styles.statValue}>{USER.streak}</Text>
+            <Text style={styles.statValue}>{user?.completedCourses?.length || 0}</Text>
+            <Text style={styles.statLabel}>Courses Completed</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{user?.points || 0}</Text>
+            <Text style={styles.statLabel}>Points Earned</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{user?.streak || 0}</Text>
             <Text style={styles.statLabel}>Day Streak</Text>
           </View>
           <View style={styles.statItem}>
-            <FontAwesome5 name="clock" size={20} color="#FFF" />
-            <Text style={styles.statValue}>{USER.totalWatchTime}</Text>
-            <Text style={styles.statLabel}>Watch Time</Text>
-          </View>
-          <View style={styles.statItem}>
-            <FontAwesome5 name="certificate" size={20} color="#FFF" />
-            <Text style={styles.statValue}>{USER.completedCourses}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </View>
-          <View style={styles.statItem}>
-            <FontAwesome5 name="trophy" size={20} color="#FFF" />
-            <Text style={styles.statValue}>{USER.achievements}</Text>
-            <Text style={styles.statLabel}>Achievements</Text>
+            <Text style={styles.statValue}>{user?.bookmarkedVideos?.length || 0}</Text>
+            <Text style={styles.statLabel}>Saved Videos</Text>
           </View>
         </View>
       </LinearGradient>
     </View>
   )
 
-  const renderSearchBar = () => (
-    <View style={styles.searchContainer}>
-      <View style={styles.searchInput}>
-        <Ionicons name="search" size={20} color="#666" />
-        <TextInput
-          style={styles.searchTextInput}
-          placeholder="Search your library..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor="#666"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <Ionicons name="close-circle" size={20} color="#666" />
-          </TouchableOpacity>
-        )}
-      </View>
-      <TouchableOpacity style={styles.filterButton}>
-        <Ionicons name="options-outline" size={24} color="#666" />
-      </TouchableOpacity>
-    </View>
-  )
-
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      {/* <Image
-        source={require("../../assets/images/empty-library.png")}
+      <Image
+        source={require("../../assets/images/empty-library.jpg")}
         style={styles.emptyStateImage}
         contentFit="contain"
-      /> */}
-      <Text style={styles.emptyStateTitle}>Your library is empty</Text>
-      <Text style={styles.emptyStateText}>
-        Start exploring courses and save them to your library to continue learning
+      />
+      <Text style={styles.emptyStateTitle}>
+        {activeTab === "history" ? "No Watch History" : "No Downloaded Videos"}
       </Text>
-      <TouchableOpacity
-        style={styles.exploreButton}
-        onPress={() => router.push("/explore")}
-      >
+      <Text style={styles.emptyStateText}>
+        {activeTab === "history"
+          ? "Your watch history will appear here once you start watching videos"
+          : "Start downloading videos to watch them later"}
+      </Text>
+      <TouchableOpacity style={styles.exploreButton} onPress={() => router.push("/explore")}>
         <Text style={styles.exploreButtonText}>Explore Courses</Text>
       </TouchableOpacity>
     </View>
@@ -271,8 +257,8 @@ export default function LibraryScreen() {
 
   const renderSkeletonLoader = () => (
     <View style={styles.skeletonContainer}>
-      {[1, 2, 3].map((item) => (
-        <View key={item} style={styles.skeletonItem}>
+      {[1, 2, 3, 4].map((key) => (
+        <View key={key} style={styles.skeletonItem}>
           <View style={styles.skeletonThumbnail} />
           <View style={styles.skeletonContent}>
             <View style={styles.skeletonTitle} />
@@ -284,39 +270,20 @@ export default function LibraryScreen() {
     </View>
   )
 
-  const renderSavedCourse = ({ item }) => (
-    <TouchableOpacity style={styles.courseItem} onPress={() => router.push(`/video/${item.id}`)}>
-      <Image source={item.thumbnail} style={styles.thumbnail} contentFit="cover" />
-      <View style={styles.courseInfo}>
-        <Text style={styles.courseTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text style={styles.instructorName}>{item.instructor}</Text>
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${item.progress}%` }]} />
-          </View>
-          <Text style={styles.progressText}>{item.progress}% completed</Text>
-        </View>
-        <Text style={styles.lastWatched}>Last watched {item.lastWatched}</Text>
-      </View>
-    </TouchableOpacity>
-  )
-
   const renderHistoryItem = ({ item }) => (
-    <TouchableOpacity style={styles.historyItem} onPress={() => router.push(`/video/${item.id}`)}>
-      <Image source={item.thumbnail} style={styles.historyThumbnail} contentFit="cover" />
+    <TouchableOpacity style={styles.historyItem} onPress={() => handleVideoPress(item.id)}>
+      <Image source={{ uri: item.thumbnail }} style={styles.historyThumbnail} contentFit="cover" />
       <View style={styles.historyInfo}>
         <Text style={styles.historyTitle} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={styles.historyMeta}>Watched {item.watchedOn}</Text>
+        <Text style={styles.historyMeta}>Watched {item.watchedOn || "recently"}</Text>
         <View style={styles.historyProgress}>
           <Text style={styles.historyDuration}>
-            {item.completed ? "Completed" : `Watched ${item.watchedDuration} of ${item.duration}`}
+            {item.completed ? "Completed" : `Watched ${item.watchedDuration || "0:00"} of ${item.duration}`}
           </Text>
           {!item.completed && (
-            <TouchableOpacity style={styles.resumeButton}>
+            <TouchableOpacity style={styles.resumeButton} onPress={() => handleVideoPress(item.id)}>
               <Text style={styles.resumeText}>Resume</Text>
             </TouchableOpacity>
           )}
@@ -325,173 +292,11 @@ export default function LibraryScreen() {
     </TouchableOpacity>
   )
 
-  const renderCategories = () => (
-    <View style={styles.categoriesContainer}>
-      <Text style={styles.sectionTitle}>Categories</Text>
-      <FlatList
-        horizontal
-        data={CATEGORIES}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.categoryItem,
-              selectedCategory === item.id && styles.selectedCategory,
-            ]}
-            onPress={() => setSelectedCategory(item.id)}
-          >
-            <FontAwesome5 name={item.icon} size={20} color={selectedCategory === item.id ? "#FFF" : "#666"} />
-            <Text style={[styles.categoryName, selectedCategory === item.id && styles.selectedCategoryText]}>
-              {item.name}
-            </Text>
-            <Text style={[styles.categoryCount, selectedCategory === item.id && styles.selectedCategoryText]}>
-              {item.count}
-            </Text>
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item) => item.id}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      />
-    </View>
-  )
-
-  const renderContinueLearning = () => (
-    <View style={styles.continueLearningContainer}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Continue Learning</Text>
-        <TouchableOpacity>
-          <Text style={styles.seeAllButton}>See All</Text>
-        </TouchableOpacity>
-      </View>
-      <FlatList
-        horizontal
-        data={CONTINUE_LEARNING}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.continueLearningCard}
-            onPress={() => router.push(`/video/${item.id}`)}
-          >
-            <Image source={item.thumbnail} style={styles.continueLearningThumbnail} contentFit="cover" />
-            <View style={styles.continueLearningInfo}>
-              <Text style={styles.continueLearningTitle} numberOfLines={2}>
-                {item.title}
-              </Text>
-              <Text style={styles.continueLearningInstructor}>{item.instructor}</Text>
-              <View style={styles.continueLearningProgress}>
-                <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${item.progress}%` }]} />
-                </View>
-                <Text style={styles.progressText}>{item.progress}% completed</Text>
-              </View>
-              <Text style={styles.nextLesson}>Next: {item.nextLesson}</Text>
-              <Text style={styles.lastWatched}>Last watched {item.lastWatched}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item) => item.id}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.continueLearningList}
-      />
-    </View>
-  )
-
-  const renderRecommendations = () => (
-    <View style={styles.recommendationsContainer}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recommended for You</Text>
-        <TouchableOpacity>
-          <Text style={styles.seeAllButton}>See All</Text>
-        </TouchableOpacity>
-      </View>
-      <FlatList
-        horizontal
-        data={RECOMMENDATIONS}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.recommendationCard}
-            onPress={() => router.push(`/video/${item.id}`)}
-          >
-            <Image source={item.thumbnail} style={styles.recommendationThumbnail} contentFit="cover" />
-            <View style={styles.recommendationInfo}>
-              <Text style={styles.recommendationTitle} numberOfLines={2}>
-                {item.title}
-              </Text>
-              <Text style={styles.recommendationInstructor}>{item.instructor}</Text>
-              <View style={styles.recommendationMeta}>
-                <View style={styles.ratingContainer}>
-                  <FontAwesome5 name="star" size={12} color="#FFD700" />
-                  <Text style={styles.ratingText}>{item.rating}</Text>
-                </View>
-                <Text style={styles.studentsText}>{item.students} students</Text>
-                <Text style={styles.durationText}>{item.duration}</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        )}
-        keyExtractor={(item) => item.id}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.recommendationsList}
-      />
-    </View>
-  )
-
-  const renderLearningGoal = () => (
-    <View style={styles.learningGoalContainer}>
-      <LinearGradient
-        colors={["#4A90E2", "#357ABD"]}
-        style={styles.learningGoalGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.learningGoalHeader}>
-          <Text style={styles.learningGoalTitle}>Daily Learning Goal</Text>
-          <TouchableOpacity>
-            <Ionicons name="settings-outline" size={20} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.learningGoalProgress}>
-          <View style={styles.learningGoalBar}>
-            <View
-              style={[
-                styles.learningGoalFill,
-                { width: `${(USER.completedToday / USER.dailyGoal) * 100}%` },
-              ]}
-            />
-          </View>
-          <Text style={styles.learningGoalText}>
-            {USER.completedToday} of {USER.dailyGoal} minutes
-          </Text>
-        </View>
-        <Text style={styles.learningGoalSubtext}>
-          {USER.dailyGoal - USER.completedToday} minutes left today
-        </Text>
-      </LinearGradient>
-    </View>
-  )
-
   return (
     <SafeAreaView style={styles.container}>
       {renderUserStats()}
-      {renderLearningGoal()}
-      {renderSearchBar()}
-      {renderCategories()}
-      {renderContinueLearning()}
-      {renderRecommendations()}
       
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "saved" && styles.activeTab]}
-          onPress={() => setActiveTab("saved")}
-        >
-          <FontAwesome5
-            name="bookmark"
-            size={16}
-            color={activeTab === "saved" ? "#FF6B6B" : "#666"}
-            solid={activeTab === "saved"}
-          />
-          <Text style={[styles.tabText, activeTab === "saved" && styles.activeTabText]}>Saved Courses</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={[styles.tab, activeTab === "history" && styles.activeTab]}
           onPress={() => setActiveTab("history")}
@@ -511,21 +316,9 @@ export default function LibraryScreen() {
 
       {isLoading ? (
         renderSkeletonLoader()
-      ) : activeTab === "saved" ? (
-        <FlatList
-          data={SAVED_COURSES}
-          renderItem={renderSavedCourse}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListEmptyComponent={renderEmptyState}
-        />
       ) : (
         <FlatList
-          data={WATCH_HISTORY}
+          data={watchHistory}
           renderItem={renderHistoryItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
@@ -1086,3 +879,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 })
+
+export default LibraryScreen

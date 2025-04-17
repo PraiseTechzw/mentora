@@ -916,3 +916,40 @@ export async function discoverEducationalChannels(): Promise<{ name: string; cha
     return []
   }
 }
+
+export interface AggregatedVideo {
+  id: string
+  title: string
+  description: string
+  thumbnail: string
+  videoUrl: string
+  duration: string
+  instructor: string
+  source: "youtube" | "udemy" | "coursera"
+  rating?: number
+  students?: number
+  progress?: number
+  lastWatched?: string
+  nextLesson?: string
+  watchedDuration?: string
+  completed?: boolean
+}
+
+export const getVideoDetails = async (videoId: string): Promise<AggregatedVideo | null> => {
+  try {
+    // First try to find the video in our aggregated content
+    const allContent = await getAggregatedContent()
+    const video = allContent.find(v => v.id === videoId)
+    if (video) {
+      return video
+    }
+
+    // If not found in aggregated content, fetch directly from source
+    // This would typically involve calling the appropriate API based on the video ID format
+    // For now, we'll return null if not found in aggregated content
+    return null
+  } catch (error) {
+    console.error("Error fetching video details:", error)
+    return null
+  }
+}
