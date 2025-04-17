@@ -83,8 +83,39 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
     }
   }
 
+  const handlePress = () => {
+    console.log('Video card pressed:', {
+      id: video.id,
+      title: video.title,
+      source: video.source,
+      videoUrl: video.videoUrl
+    });
+    onPress?.();
+  };
+
   const handleLongPress = () => {
+    console.log('Video card long pressed:', {
+      id: video.id,
+      title: video.title
+    });
     setShowOptions(true)
+  }
+
+  const handleImageLoad = () => {
+    console.log('Thumbnail loaded:', {
+      id: video.id,
+      thumbnail: video.thumbnail
+    });
+    setImageLoading(false)
+  }
+
+  const handleImageError = () => {
+    console.error('Thumbnail load failed:', {
+      id: video.id,
+      thumbnail: video.thumbnail
+    });
+    setImageError(true)
+    setImageLoading(false)
   }
 
   const formatDate = (dateString: string) => {
@@ -109,7 +140,7 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
   return (
     <Animated.View style={[scaleAnim]}>
       <Pressable
-        onPress={onPress}
+        onPress={handlePress}
         onLongPress={handleLongPress}
         onPressIn={() => {
           setIsPressed(true)
@@ -133,11 +164,8 @@ export function ModernVideoCard({ video, onPress, style }: ModernVideoCardProps)
             style={[styles.thumbnail, imageLoading && styles.hiddenImage]} 
             contentFit="cover"
             onLoadStart={() => setImageLoading(true)}
-            onLoadEnd={() => setImageLoading(false)}
-            onError={() => {
-              setImageError(true)
-              setImageLoading(false)
-            }}
+            onLoadEnd={handleImageLoad}
+            onError={handleImageError}
           />
           
           {!imageError && (

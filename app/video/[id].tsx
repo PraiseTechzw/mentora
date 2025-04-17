@@ -78,28 +78,58 @@ export default function VideoScreen() {
   const loadVideoData = async () => {
     setIsLoading(true)
     try {
+      console.log('Loading video data for ID:', params.id);
       const allVideos = await getAggregatedContent()
       const videoData = allVideos.find((v) => v.id === params.id)
 
       if (videoData) {
-        setVideo(videoData)
+        // Ensure videoUrl is properly formatted
+        let videoUrl = videoData.videoUrl;
+        if (videoData.source === 'youtube') {
+          // Convert YouTube URLs to embed format if needed
+          if (!videoUrl.includes('embed')) {
+            const videoId = videoUrl.split('v=')[1]?.split('&')[0] || videoUrl.split('/').pop();
+            videoUrl = `https://www.youtube.com/embed/${videoId}?modestbranding=1&rel=0`;
+          }
+        }
+
+        console.log('Video data loaded:', {
+          id: videoData.id,
+          title: videoData.title,
+          source: videoData.source,
+          videoUrl: videoUrl,
+          originalUrl: videoData.videoUrl
+        });
+
+        // Update video data with formatted URL
+        const updatedVideoData = {
+          ...videoData,
+          videoUrl: videoUrl
+        };
+        
+        setVideo(updatedVideoData)
         addToWatchHistory(
           {
-            id: videoData.id,
-            title: videoData.title,
-            channelTitle: videoData.channelName,
-            viewCount: videoData.views,
-            duration: videoData.duration,
-            thumbnail: videoData.thumbnail,
-            description: videoData.description,
-            publishedAt: videoData.publishedAt,
-            channelId: videoData.channelId,
+            id: updatedVideoData.id,
+            title: updatedVideoData.title,
+            channelTitle: updatedVideoData.channelName,
+            viewCount: updatedVideoData.views,
+            duration: updatedVideoData.duration,
+            thumbnail: updatedVideoData.thumbnail,
+            description: updatedVideoData.description,
+            publishedAt: updatedVideoData.publishedAt,
+            channelId: updatedVideoData.channelId,
           },
           "0:00",
         )
 
         const related = allVideos.filter((v) => v.id !== params.id).slice(0, 5)
         setRelatedVideos(related)
+      } else {
+        console.error('Video not found:', {
+          id: params.id,
+          availableVideos: allVideos.map(v => v.id)
+        });
       }
     } catch (error) {
       console.error("Error loading video data:", error)
@@ -132,6 +162,11 @@ export default function VideoScreen() {
   }
 
   const handleVideoProgress = (progress: number) => {
+    console.log('Video progress updated:', {
+      videoId: video?.id,
+      progress,
+      currentTime: Math.floor(progress * Number.parseInt(video?.duration || '0'))
+    });
     setProgress(progress)
     if (video) {
       const currentTime = Math.floor(progress * Number.parseInt(video.duration))
@@ -153,6 +188,10 @@ export default function VideoScreen() {
   }
 
   const handleVideoComplete = () => {
+    console.log('Video completed:', {
+      videoId: video?.id,
+      title: video?.title
+    });
     if (video) {
       addToWatchHistory(
         {

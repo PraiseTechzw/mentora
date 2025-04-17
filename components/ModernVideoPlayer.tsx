@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useEffect } from "react"
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform, PanResponder, Pressable } from "react-native"
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform, PanResponder, Pressable, ActivityIndicator } from "react-native"
 import { WebView } from "react-native-webview"
 import { Ionicons } from "@expo/vector-icons"
 import * as ScreenOrientation from "expo-screen-orientation"
@@ -45,6 +45,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [brightness, setBrightness] = useState(1)
   const [isBuffering, setIsBuffering] = useState(false)
   const [doubleTapSide, setDoubleTapSide] = useState<"left" | "right" | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const [isRetrying, setIsRetrying] = useState(false)
 
   // Animated values
   const controlsOpacity = useSharedValue(1)
@@ -235,18 +237,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`
   }
 
-  // Handle video progress
-  const handleProgress = (event: any) => {
-    if (event.nativeEvent.progress) {
-      const progress = event.nativeEvent.progress
-      setCurrentTime(progress * duration)
-      progressWidth.value = progress * 100
-      onProgress?.(progress)
-    }
-  }
-
   // Handle video loaded
   const handleLoaded = (event: any) => {
+    console.log('Video loaded:', {
+      duration: event.nativeEvent.duration,
+      title,
+      channelName
+    });
     if (event.nativeEvent.duration) {
       setDuration(event.nativeEvent.duration)
     }
@@ -254,19 +251,49 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     bufferingOpacity.value = withTiming(0)
   }
 
+  // Handle video progress
+  const handleProgress = (event: any) => {
+    if (event.nativeEvent.progress) {
+      const progress = event.nativeEvent.progress
+      const currentTime = progress * duration
+      console.log('Video progress:', {
+        progress,
+        currentTime,
+        duration,
+        title
+      });
+      setCurrentTime(currentTime)
+      progressWidth.value = progress * 100
+      onProgress?.(progress)
+    }
+  }
+
   // Handle video ended
   const handleEnded = () => {
+    console.log('Video ended:', {
+      title,
+      channelName,
+      duration
+    });
     setIsPlaying(false)
     onComplete?.()
   }
 
   // Handle buffering
   const handleBufferingStart = () => {
+    console.log('Video buffering started:', {
+      title,
+      currentTime
+    });
     setIsBuffering(true)
     bufferingOpacity.value = withTiming(1)
   }
 
   const handleBufferingEnd = () => {
+    console.log('Video buffering ended:', {
+      title,
+      currentTime
+    });
     setIsBuffering(false)
     bufferingOpacity.value = withTiming(0)
   }
@@ -325,7 +352,88 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [])
 
-  // HTML to inject into WebView
+  // Handle WebView messages
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data)
+      console.log('WebView message received:', data);
+
+      switch (data.type) {
+        case "loaded":
+          handleLoaded({ nativeEvent: { duration: data.duration } })
+          setError(null) // Clear any previous errors on successful load
+          break
+        case "progress":
+          handleProgress({ nativeEvent: { progress: data.progress } })
+          break
+        case "ended":
+          handleEnded()
+          break
+        case "buffering_start":
+          handleBufferingStart()
+          break
+        case "buffering_end":
+          handleBufferingEnd()
+          break
+        case "error":
+          handleError(data.message)
+          break
+        default:
+          console.log('Unknown message type:', data.type);
+      }
+    } catch (e) {
+      console.error("Error parsing WebView message:", e)
+      handleError("Failed to parse video data")
+    }
+  }
+
+  const handleError = (message: string) => {
+    console.error('Video error:', {
+      message,
+      title,
+      videoUrl,
+      currentTime
+    });
+    setError(message)
+    setIsBuffering(false)
+    bufferingOpacity.value = withTiming(0)
+  }
+
+  const handleRetry = async () => {
+    if (retryCount >= 3) {
+      console.error('Max retry attempts reached:', {
+        title,
+        videoUrl,
+        retryCount
+      });
+      setError("Maximum retry attempts reached. Please try again later.")
+      return
+    }
+
+    console.log('Retrying video playback:', {
+      title,
+      retryCount: retryCount + 1
+    });
+
+    setIsRetrying(true)
+    setError(null)
+    
+    try {
+      webViewRef.current?.reload()
+      setRetryCount(prev => prev + 1)
+    } catch (e) {
+      console.error('Retry failed:', {
+        error: e,
+        title,
+        videoUrl
+      });
+      handleError("Failed to retry video playback")
+    } finally {
+      setIsRetrying(false)
+    }
+  }
+
+  // Update the injected HTML to include better error handling
   const injectedHTML = `
     <!DOCTYPE html>
     <html>
@@ -345,6 +453,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             height: 100%;
             object-fit: contain;
           }
+          .error-message {
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+          }
         </style>
       </head>
       <body>
@@ -355,12 +469,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           ${isMuted ? "muted" : ""} 
           playsinline
           webkit-playsinline
+          onerror="handleVideoError(event)"
         ></video>
         <script>
           const video = document.getElementById('videoPlayer');
           
+          function handleVideoError(event) {
+            console.error('Video error:', event.target.error);
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'error',
+              message: 'Video playback failed: ' + (event.target.error?.message || 'Unknown error')
+            }));
+          }
+          
           // Send events to React Native
           video.addEventListener('loadedmetadata', function() {
+            console.log('Video metadata loaded:', video.duration);
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'loaded',
               duration: video.duration
@@ -368,63 +492,40 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           });
           
           video.addEventListener('timeupdate', function() {
+            const progress = video.currentTime / video.duration;
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'progress',
-              progress: video.currentTime / video.duration
+              progress: progress
             }));
           });
           
           video.addEventListener('ended', function() {
+            console.log('Video ended');
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'ended'
             }));
           });
           
           video.addEventListener('waiting', function() {
+            console.log('Video buffering started');
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'buffering_start'
             }));
           });
           
           video.addEventListener('playing', function() {
+            console.log('Video buffering ended');
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'buffering_end'
             }));
           });
           
           // Initial play for autoplay
-          ${autoPlay ? "video.play().catch(e => console.log(e));" : ""}
+          ${autoPlay ? "video.play().catch(e => handleVideoError(e));" : ""}
         </script>
       </body>
     </html>
   `
-
-  // Handle WebView messages
-  const handleWebViewMessage = (event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data)
-
-      switch (data.type) {
-        case "loaded":
-          handleLoaded({ nativeEvent: { duration: data.duration } })
-          break
-        case "progress":
-          handleProgress({ nativeEvent: { progress: data.progress } })
-          break
-        case "ended":
-          handleEnded()
-          break
-        case "buffering_start":
-          handleBufferingStart()
-          break
-        case "buffering_end":
-          handleBufferingEnd()
-          break
-      }
-    } catch (e) {
-      console.log("Error parsing WebView message", e)
-    }
-  }
 
   return (
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
@@ -577,8 +678,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <BlurView intensity={70} style={styles.errorBlur}>
               <Ionicons name="alert-circle" size={36} color="#00E0FF" style={styles.errorIcon} />
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={() => setError(null)}>
-                <Text style={styles.retryText}>Retry</Text>
+              <TouchableOpacity 
+                style={[styles.retryButton, isRetrying && styles.retryButtonDisabled]} 
+                onPress={handleRetry}
+                disabled={isRetrying}
+              >
+                {isRetrying ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <Text style={styles.retryText}>Retry ({3 - retryCount} attempts left)</Text>
+                )}
               </TouchableOpacity>
             </BlurView>
           </View>
@@ -867,5 +976,8 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "bold",
     fontSize: 14,
+  },
+  retryButtonDisabled: {
+    opacity: 0.7,
   },
 })
