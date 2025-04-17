@@ -1,11 +1,15 @@
-import React, { useState, useRef, useEffect } from "react"
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform, Animated, PanResponder } from "react-native"
-import { WebView } from 'react-native-webview'
-import { FontAwesome5 } from "@expo/vector-icons"
+"use client"
+
+import type React from "react"
+import { useState, useRef, useEffect } from "react"
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform, PanResponder, Pressable } from "react-native"
+import { WebView } from "react-native-webview"
+import { Ionicons } from "@expo/vector-icons"
 import * as ScreenOrientation from "expo-screen-orientation"
 import { StatusBar } from "expo-status-bar"
 import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from "react-native-reanimated"
 
 interface VideoPlayerProps {
   videoUrl: string
@@ -14,25 +18,25 @@ interface VideoPlayerProps {
   channelName?: string
   style?: any
   autoPlay?: boolean
-  showControls?: boolean
+  showControlsInitially?: boolean
   onProgress?: (progress: number) => void
   onComplete?: () => void
 }
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({ 
-  videoUrl, 
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({
+  videoUrl,
   thumbnailUrl,
   title = "Video Title",
   channelName = "",
-  style, 
+  style,
   autoPlay = false,
-  showControls = true,
+  showControlsInitially = true,
   onProgress,
-  onComplete
+  onComplete,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showControlsOverlay, setShowControlsOverlay] = useState(true)
+  const [showControlsOverlay, setShowControlsOverlay] = useState(showControlsInitially)
   const [isPlaying, setIsPlaying] = useState(autoPlay)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
@@ -40,74 +44,165 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isMuted, setIsMuted] = useState(false)
   const [brightness, setBrightness] = useState(1)
   const [isBuffering, setIsBuffering] = useState(false)
+  const [doubleTapSide, setDoubleTapSide] = useState<"left" | "right" | null>(null)
+
+  // Animated values
+  const controlsOpacity = useSharedValue(1)
+  const progressWidth = useSharedValue(0)
+  const volumeHeight = useSharedValue(volume * 100)
+  const brightnessHeight = useSharedValue(brightness * 100)
+  const doubleTapOpacity = useSharedValue(0)
+  const doubleTapScale = useSharedValue(1)
+  const bufferingOpacity = useSharedValue(0)
 
   const controlsTimeout = useRef<NodeJS.Timeout>()
-  const fadeAnim = useRef(new Animated.Value(1)).current
-  const { width, height } = Dimensions.get('window')
+  const doubleTapTimeout = useRef<NodeJS.Timeout>()
+  const lastTap = useRef<number>(0)
+  const webViewRef = useRef<WebView>(null)
+  const { width } = Dimensions.get("window")
+
+  // Double tap handler for seeking
+  const handleDoubleTap = (x: number) => {
+    const now = Date.now()
+    const DOUBLE_TAP_DELAY = 300
+
+    if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+      // Double tap detected
+      if (x < width / 2) {
+        // Left side - seek backward
+        setDoubleTapSide("left")
+        handleSeek(-10)
+      } else {
+        // Right side - seek forward
+        setDoubleTapSide("right")
+        handleSeek(10)
+      }
+
+      // Animate double tap indicator
+      doubleTapOpacity.value = withTiming(1, { duration: 200 })
+      doubleTapScale.value = withSpring(1.2)
+
+      // Hide after animation
+      if (doubleTapTimeout.current) {
+        clearTimeout(doubleTapTimeout.current)
+      }
+
+      doubleTapTimeout.current = setTimeout(() => {
+        doubleTapOpacity.value = withTiming(0, { duration: 300 })
+        doubleTapScale.value = withTiming(1)
+      }, 800)
+    }
+
+    lastTap.current = now
+  }
 
   // Gesture controls
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        // Only respond to vertical gestures for volume/brightness
+        return Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
+      },
       onPanResponderGrant: () => {
-        setShowControlsOverlay(true)
-        fadeInControls()
+        showControls()
       },
       onPanResponderMove: (_, gestureState) => {
         // Handle volume and brightness gestures
         if (gestureState.moveX < width / 3) {
           // Left side: brightness control
-          const newBrightness = Math.max(0, Math.min(1, brightness + gestureState.dy / 200))
+          const newBrightness = Math.max(0, Math.min(1, brightness - gestureState.dy / 200))
           setBrightness(newBrightness)
+          brightnessHeight.value = newBrightness * 100
         } else if (gestureState.moveX > (width * 2) / 3) {
           // Right side: volume control
-          const newVolume = Math.max(0, Math.min(1, volume + gestureState.dy / 200))
+          const newVolume = Math.max(0, Math.min(1, volume - gestureState.dy / 200))
           setVolume(newVolume)
+          volumeHeight.value = newVolume * 100
         }
       },
       onPanResponderRelease: () => {
-        fadeOutControls()
+        hideControlsWithDelay()
       },
-    })
+    }),
   ).current
 
-  const fadeInControls = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start()
+  // Tap handler for showing/hiding controls
+  const handleTap = () => {
+    if (showControlsOverlay) {
+      hideControls()
+    } else {
+      showControls()
+    }
   }
 
-  const fadeOutControls = () => {
+  // Show controls
+  const showControls = () => {
+    setShowControlsOverlay(true)
+    controlsOpacity.value = withTiming(1, { duration: 200 })
+
     if (controlsTimeout.current) {
       clearTimeout(controlsTimeout.current)
     }
+  }
+
+  // Hide controls
+  const hideControls = () => {
+    setShowControlsOverlay(false)
+    controlsOpacity.value = withTiming(0, { duration: 300 })
+  }
+
+  // Hide controls with delay
+  const hideControlsWithDelay = () => {
+    if (controlsTimeout.current) {
+      clearTimeout(controlsTimeout.current)
+    }
+
     controlsTimeout.current = setTimeout(() => {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start()
+      hideControls()
     }, 3000)
   }
 
-  useEffect(() => {
-    fadeOutControls()
-    return () => {
-      if (controlsTimeout.current) {
-        clearTimeout(controlsTimeout.current)
-      }
-    }
-  }, [])
+  // Handle seeking
+  const handleSeek = (seconds: number) => {
+    const newTime = Math.max(0, Math.min(duration, currentTime + seconds))
+    setCurrentTime(newTime)
 
-  const togglePlayPause = () => {
-    setIsPlaying(!isPlaying)
-    setShowControlsOverlay(true)
-    fadeInControls()
+    // Update progress
+    progressWidth.value = (newTime / duration) * 100
+
+    // Send command to WebView
+    const seekCommand = `
+      var video = document.querySelector('video');
+      if (video) {
+        video.currentTime = ${newTime};
+      }
+      true;
+    `
+    webViewRef.current?.injectJavaScript(seekCommand)
   }
 
+  // Toggle play/pause
+  const togglePlayPause = () => {
+    setIsPlaying(!isPlaying)
+    showControls()
+
+    // Send command to WebView
+    const playPauseCommand = `
+      var video = document.querySelector('video');
+      if (video) {
+        if (video.paused) {
+          video.play();
+        } else {
+          video.pause();
+        }
+      }
+      true;
+    `
+    webViewRef.current?.injectJavaScript(playPauseCommand)
+  }
+
+  // Toggle fullscreen
   const toggleFullscreen = async () => {
     if (isFullscreen) {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
@@ -117,16 +212,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsFullscreen(!isFullscreen)
   }
 
+  // Toggle mute
   const toggleMute = () => {
     setIsMuted(!isMuted)
-    setShowControlsOverlay(true)
-    fadeInControls()
+    showControls()
+
+    // Send command to WebView
+    const muteCommand = `
+      var video = document.querySelector('video');
+      if (video) {
+        video.muted = ${!isMuted};
+      }
+      true;
+    `
+    webViewRef.current?.injectJavaScript(muteCommand)
   }
 
+  // Format time
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`
   }
 
   // Handle video progress
@@ -134,6 +240,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (event.nativeEvent.progress) {
       const progress = event.nativeEvent.progress
       setCurrentTime(progress * duration)
+      progressWidth.value = progress * 100
       onProgress?.(progress)
     }
   }
@@ -143,6 +250,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (event.nativeEvent.duration) {
       setDuration(event.nativeEvent.duration)
     }
+    setIsBuffering(false)
+    bufferingOpacity.value = withTiming(0)
   }
 
   // Handle video ended
@@ -151,95 +260,324 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     onComplete?.()
   }
 
+  // Handle buffering
+  const handleBufferingStart = () => {
+    setIsBuffering(true)
+    bufferingOpacity.value = withTiming(1)
+  }
+
+  const handleBufferingEnd = () => {
+    setIsBuffering(false)
+    bufferingOpacity.value = withTiming(0)
+  }
+
+  // Animated styles
+  const controlsAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: controlsOpacity.value,
+    }
+  })
+
+  const progressAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      width: `${progressWidth.value}%`,
+    }
+  })
+
+  const volumeIndicatorStyle = useAnimatedStyle(() => {
+    return {
+      height: `${volumeHeight.value}%`,
+    }
+  })
+
+  const brightnessIndicatorStyle = useAnimatedStyle(() => {
+    return {
+      height: `${brightnessHeight.value}%`,
+    }
+  })
+
+  const doubleTapAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: doubleTapOpacity.value,
+      transform: [{ scale: doubleTapScale.value }],
+    }
+  })
+
+  const bufferingAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: bufferingOpacity.value,
+    }
+  })
+
+  // Initialize controls timeout
+  useEffect(() => {
+    if (showControlsInitially) {
+      hideControlsWithDelay()
+    }
+
+    return () => {
+      if (controlsTimeout.current) {
+        clearTimeout(controlsTimeout.current)
+      }
+      if (doubleTapTimeout.current) {
+        clearTimeout(doubleTapTimeout.current)
+      }
+    }
+  }, [])
+
+  // HTML to inject into WebView
+  const injectedHTML = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <style>
+          body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+          }
+          video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+          }
+        </style>
+      </head>
+      <body>
+        <video 
+          id="videoPlayer" 
+          src="${videoUrl}" 
+          ${autoPlay ? "autoplay" : ""} 
+          ${isMuted ? "muted" : ""} 
+          playsinline
+          webkit-playsinline
+        ></video>
+        <script>
+          const video = document.getElementById('videoPlayer');
+          
+          // Send events to React Native
+          video.addEventListener('loadedmetadata', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'loaded',
+              duration: video.duration
+            }));
+          });
+          
+          video.addEventListener('timeupdate', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'progress',
+              progress: video.currentTime / video.duration
+            }));
+          });
+          
+          video.addEventListener('ended', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'ended'
+            }));
+          });
+          
+          video.addEventListener('waiting', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'buffering_start'
+            }));
+          });
+          
+          video.addEventListener('playing', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'buffering_end'
+            }));
+          });
+          
+          // Initial play for autoplay
+          ${autoPlay ? "video.play().catch(e => console.log(e));" : ""}
+        </script>
+      </body>
+    </html>
+  `
+
+  // Handle WebView messages
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data)
+
+      switch (data.type) {
+        case "loaded":
+          handleLoaded({ nativeEvent: { duration: data.duration } })
+          break
+        case "progress":
+          handleProgress({ nativeEvent: { progress: data.progress } })
+          break
+        case "ended":
+          handleEnded()
+          break
+        case "buffering_start":
+          handleBufferingStart()
+          break
+        case "buffering_end":
+          handleBufferingEnd()
+          break
+      }
+    } catch (e) {
+      console.log("Error parsing WebView message", e)
+    }
+  }
+
   return (
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer, style]}>
       <StatusBar hidden={isFullscreen} />
-      <View style={styles.videoWrapper} {...panResponder.panHandlers}>
+
+      {/* Video Player */}
+      <View style={styles.videoWrapper}>
         <WebView
-          source={{ uri: videoUrl }}
+          ref={webViewRef}
+          source={{ html: injectedHTML }}
           style={styles.video}
-          allowsFullscreenVideo={true}
+          allowsFullscreenVideo={false} // We handle fullscreen ourselves
           allowsInlineMediaPlayback={true}
           mediaPlaybackRequiresUserAction={false}
+          onMessage={handleWebViewMessage}
           onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            setError(`WebView error: ${nativeEvent.description}`);
+            const { nativeEvent } = syntheticEvent
+            setError(`WebView error: ${nativeEvent.description}`)
           }}
-          onLoad={handleLoaded}
-          onProgress={handleProgress}
-          onEnded={handleEnded}
         />
 
-        {/* Floating Controls Overlay */}
-        <Animated.View style={[styles.controlsOverlay, { opacity: fadeAnim }]}>
+        {/* Tap Handler */}
+        <Pressable
+          style={styles.tapHandler}
+          onPress={handleTap}
+          onLongPress={togglePlayPause}
+          delayLongPress={500}
+          onTouchEnd={(e) => handleDoubleTap(e.nativeEvent.locationX)}
+        />
+
+        {/* Gesture Handler */}
+        <View style={styles.gestureHandler} {...panResponder.panHandlers} />
+
+        {/* Controls Overlay */}
+        <Animated.View style={[styles.controlsOverlay, controlsAnimatedStyle]}>
           <LinearGradient
-            colors={['rgba(0,0,0,0.7)', 'transparent', 'transparent', 'rgba(0,0,0,0.7)']}
+            colors={["rgba(0,0,0,0.7)", "transparent", "transparent", "rgba(0,0,0,0.7)"]}
             style={styles.gradient}
           >
             {/* Top Controls */}
             <View style={styles.topControls}>
-              <TouchableOpacity onPress={() => setIsFullscreen(false)}>
-                <FontAwesome5 name="chevron-down" size={20} color="#FFF" />
-              </TouchableOpacity>
-              <Text style={styles.title} numberOfLines={1}>{title}</Text>
-              <TouchableOpacity onPress={toggleFullscreen}>
-                <FontAwesome5 name="expand" size={20} color="#FFF" />
+              {isFullscreen && (
+                <TouchableOpacity style={styles.backButton} onPress={() => setIsFullscreen(false)}>
+                  <Ionicons name="chevron-down" size={24} color="#FFF" />
+                </TouchableOpacity>
+              )}
+              <Text style={styles.title} numberOfLines={1}>
+                {title}
+              </Text>
+              <TouchableOpacity style={styles.iconButton} onPress={toggleFullscreen}>
+                <Ionicons name={isFullscreen ? "contract" : "expand"} size={22} color="#FFF" />
               </TouchableOpacity>
             </View>
 
             {/* Center Controls */}
             <View style={styles.centerControls}>
-              <TouchableOpacity onPress={() => {/* Seek backward */}}>
-                <FontAwesome5 name="step-backward" size={24} color="#FFF" />
+              <TouchableOpacity style={styles.seekButton} onPress={() => handleSeek(-10)}>
+                <Ionicons name="play-back" size={22} color="#FFF" />
+                <Text style={styles.seekText}>10s</Text>
               </TouchableOpacity>
+
               <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
-                <FontAwesome5 name={isPlaying ? "pause" : "play"} size={32} color="#FFF" />
+                <Ionicons
+                  name={isPlaying ? "pause" : "play"}
+                  size={isPlaying ? 32 : 28}
+                  color="#FFF"
+                  style={isPlaying ? {} : { marginLeft: 4 }}
+                />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => {/* Seek forward */}}>
-                <FontAwesome5 name="step-forward" size={24} color="#FFF" />
+
+              <TouchableOpacity style={styles.seekButton} onPress={() => handleSeek(10)}>
+                <Text style={styles.seekText}>10s</Text>
+                <Ionicons name="play-forward" size={22} color="#FFF" />
               </TouchableOpacity>
             </View>
 
             {/* Bottom Controls */}
             <View style={styles.bottomControls}>
               <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
-              <View style={styles.progressBar}>
-                <View style={[styles.progress, { width: `${(currentTime / duration) * 100}%` }]} />
+
+              <View style={styles.progressBarContainer}>
+                <View style={styles.progressBar}>
+                  <Animated.View style={[styles.progress, progressAnimatedStyle]} />
+                </View>
+
+                {/* Progress Thumb */}
+                <Animated.View style={[styles.progressThumb, { left: `${(currentTime / duration) * 100}%` }]} />
               </View>
+
               <Text style={styles.timeText}>{formatTime(duration)}</Text>
-              <TouchableOpacity onPress={toggleMute}>
-                <FontAwesome5 name={isMuted ? "volume-mute" : "volume-up"} size={20} color="#FFF" />
+
+              <TouchableOpacity style={styles.iconButton} onPress={toggleMute}>
+                <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={22} color="#FFF" />
               </TouchableOpacity>
             </View>
           </LinearGradient>
         </Animated.View>
 
+        {/* Double Tap Indicators */}
+        {doubleTapSide === "left" && (
+          <Animated.View style={[styles.doubleTapIndicator, styles.leftIndicator, doubleTapAnimatedStyle]}>
+            <View style={styles.doubleTapIconContainer}>
+              <Ionicons name="play-back" size={28} color="#FFF" />
+              <Text style={styles.doubleTapText}>10s</Text>
+            </View>
+          </Animated.View>
+        )}
+
+        {doubleTapSide === "right" && (
+          <Animated.View style={[styles.doubleTapIndicator, styles.rightIndicator, doubleTapAnimatedStyle]}>
+            <View style={styles.doubleTapIconContainer}>
+              <Ionicons name="play-forward" size={28} color="#FFF" />
+              <Text style={styles.doubleTapText}>10s</Text>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Gesture Indicators */}
         <View style={styles.gestureIndicators}>
-          <View style={styles.brightnessIndicator}>
-            <FontAwesome5 name="sun" size={20} color="#FFF" />
+          {/* Brightness Indicator */}
+          <View style={styles.indicatorContainer}>
+            <Ionicons name="sunny" size={20} color="#FFF" />
             <View style={styles.indicatorBar}>
-              <View style={[styles.indicatorFill, { height: `${brightness * 100}%` }]} />
+              <Animated.View style={[styles.indicatorFill, brightnessIndicatorStyle]} />
             </View>
           </View>
-          <View style={styles.volumeIndicator}>
-            <FontAwesome5 name="volume-up" size={20} color="#FFF" />
+
+          {/* Volume Indicator */}
+          <View style={styles.indicatorContainer}>
+            <Ionicons name={isMuted ? "volume-mute" : "volume-high"} size={20} color="#FFF" />
             <View style={styles.indicatorBar}>
-              <View style={[styles.indicatorFill, { height: `${volume * 100}%` }]} />
+              <Animated.View style={[styles.indicatorFill, volumeIndicatorStyle]} />
             </View>
           </View>
         </View>
+
+        {/* Buffering Indicator */}
+        <Animated.View style={[styles.bufferingContainer, bufferingAnimatedStyle]}>
+          <BlurView intensity={40} style={styles.bufferingBlur}>
+            <View style={styles.bufferingContent}>
+              <View style={styles.spinner} />
+              <Text style={styles.bufferingText}>Buffering...</Text>
+            </View>
+          </BlurView>
+        </Animated.View>
 
         {/* Error State */}
         {error && (
           <View style={styles.errorContainer}>
             <BlurView intensity={70} style={styles.errorBlur}>
-              <FontAwesome5 name="exclamation-triangle" size={30} color="#FF6B6B" style={styles.errorIcon} />
+              <Ionicons name="alert-circle" size={36} color="#00E0FF" style={styles.errorIcon} />
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity 
-                style={styles.retryButton}
-                onPress={() => setError(null)}
-              >
+              <TouchableOpacity style={styles.retryButton} onPress={() => setError(null)}>
                 <Text style={styles.retryText}>Retry</Text>
               </TouchableOpacity>
             </BlurView>
@@ -255,7 +593,7 @@ const styles = StyleSheet.create({
     width: "100%",
     aspectRatio: 16 / 9,
     backgroundColor: "#000",
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
     ...Platform.select({
       ios: {
@@ -286,6 +624,15 @@ const styles = StyleSheet.create({
   video: {
     width: "100%",
     height: "100%",
+    backgroundColor: "#000",
+  },
+  tapHandler: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
+  },
+  gestureHandler: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "transparent",
   },
   controlsOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -302,26 +649,64 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: Platform.OS === "ios" ? 40 : 16,
   },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 224, 255, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
   title: {
     color: "#FFF",
     fontSize: 16,
     fontWeight: "600",
     flex: 1,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 224, 255, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
   },
   centerControls: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
   },
+  seekButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  seekText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginHorizontal: 2,
+  },
   playButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(0, 224, 255, 0.8)",
     justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 32,
+    marginHorizontal: 24,
+    borderWidth: 3,
+    borderColor: "#FFF",
   },
   bottomControls: {
     flexDirection: "row",
@@ -330,20 +715,66 @@ const styles = StyleSheet.create({
   },
   timeText: {
     color: "#FFF",
-    fontSize: 14,
+    fontSize: 12,
+    marginHorizontal: 8,
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  progressBarContainer: {
+    flex: 1,
+    height: 20,
+    justifyContent: "center",
     marginHorizontal: 8,
   },
   progressBar: {
-    flex: 1,
     height: 4,
     backgroundColor: "rgba(255, 255, 255, 0.3)",
     borderRadius: 2,
-    marginHorizontal: 8,
   },
   progress: {
     height: "100%",
-    backgroundColor: "#FF6B6B",
+    backgroundColor: "#00E0FF",
     borderRadius: 2,
+  },
+  progressThumb: {
+    position: "absolute",
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#00E0FF",
+    borderWidth: 2,
+    borderColor: "#FFF",
+    marginLeft: -7,
+    top: 3,
+  },
+  doubleTapIndicator: {
+    position: "absolute",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(0, 224, 255, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.5)",
+  },
+  leftIndicator: {
+    left: "15%",
+    top: "40%",
+  },
+  rightIndicator: {
+    right: "15%",
+    top: "40%",
+  },
+  doubleTapIconContainer: {
+    alignItems: "center",
+  },
+  doubleTapText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginTop: 4,
   },
   gestureIndicators: {
     position: "absolute",
@@ -354,13 +785,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 16,
+    paddingVertical: 80,
     pointerEvents: "none",
   },
-  brightnessIndicator: {
+  indicatorContainer: {
     alignItems: "center",
-  },
-  volumeIndicator: {
-    alignItems: "center",
+    opacity: 0.7,
   },
   indicatorBar: {
     width: 4,
@@ -368,11 +798,43 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.3)",
     borderRadius: 2,
     marginTop: 8,
+    overflow: "hidden",
   },
   indicatorFill: {
     width: "100%",
-    backgroundColor: "#FF6B6B",
+    backgroundColor: "#00E0FF",
     borderRadius: 2,
+    position: "absolute",
+    bottom: 0,
+  },
+  bufferingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bufferingBlur: {
+    padding: 16,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  bufferingContent: {
+    alignItems: "center",
+  },
+  spinner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 3,
+    borderColor: "#00E0FF",
+    borderTopColor: "rgba(255, 255, 255, 0.5)",
+    borderRightColor: "rgba(255, 255, 255, 0.3)",
+    borderBottomColor: "rgba(255, 255, 255, 0.2)",
+    marginBottom: 8,
+  },
+  bufferingText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "500",
   },
   errorContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -382,7 +844,7 @@ const styles = StyleSheet.create({
   },
   errorBlur: {
     padding: 20,
-    borderRadius: 10,
+    borderRadius: 16,
     alignItems: "center",
     width: "80%",
   },
@@ -396,13 +858,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   retryButton: {
-    backgroundColor: "#FF6B6B",
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    backgroundColor: "#00E0FF",
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 24,
   },
   retryText: {
-    color: "#FFF",
+    color: "#000",
     fontWeight: "bold",
+    fontSize: 14,
   },
 })
