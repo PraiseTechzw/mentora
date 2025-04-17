@@ -31,14 +31,6 @@ import {
 } from "../../services/content-aggregator"
 import { AggregatedVideo } from "../../types/videoag"
 
-// User data (could be fetched from a user service in a real app)
-const USER = {
-  name: "Alex",
-  avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-  streak: 7,
-  points: 1250,
-}
-
 // Categories with icons and colors
 const CATEGORIES = [
   { id: "1", name: "Programming", icon: "laptop-code", color: "#4361EE" },
@@ -55,6 +47,17 @@ const { width } = Dimensions.get("window")
 const CARD_WIDTH = width * 0.8
 const CARD_SPACING = 10
 
+const getDayOfDay = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) {
+    return "Good Morning";
+  } else if (hour < 18) {
+    return "Good Afternoon";
+  } else {
+    return "Good Evening";
+  }
+};
+
 export default function ExploreScreen() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
@@ -66,9 +69,12 @@ export default function ExploreScreen() {
   const [featuredContent, setFeaturedContent] = useState<AggregatedVideo[]>([])
   const [trendingCourses, setTrendingCourses] = useState<AggregatedVideo[]>([])
   const [recentlyViewed, setRecentlyViewed] = useState<AggregatedVideo[]>([])
-  const [popularInstructors, setPopularInstructors] = useState<any[]>([])
   const [learningPaths, setLearningPaths] = useState<any[]>([])
   const [popularChannels, setPopularChannels] = useState<any[]>([])
+  const [userData, setUserData] = useState({
+    streak: 0,
+    points: 0
+  })
 
   // Load all content when component mounts or when search/category changes
   useEffect(() => {
@@ -91,35 +97,6 @@ export default function ExploreScreen() {
         // For now, we'll use recommended content as a placeholder
         const recent = await getRecommendedContent(["programming", "web development"], true)
         setRecentlyViewed(recent.slice(0, 5))
-        
-        // Load popular instructors (in a real app, this would come from an API)
-        // For now, we'll use a simplified version of the mock data
-        setPopularInstructors([
-          {
-            id: "i1",
-            name: "Dr. Sarah Johnson",
-            specialty: "Data Science",
-            avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-            followers: 125000,
-            source: "embedded" as const,
-          },
-          {
-            id: "i2",
-            name: "Michael Chen",
-            specialty: "Web Development",
-            avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-            followers: 98000,
-            source: "embedded" as const,
-          },
-          {
-            id: "i3",
-            name: "Emily Rodriguez",
-            specialty: "UX Design",
-            avatar: "https://randomuser.me/api/portraits/women/68.jpg",
-            followers: 75000,
-            source: "embedded" as const,
-          },
-        ])
         
         // Load learning paths (in a real app, this would come from an API)
         // For now, we'll use a simplified version of the mock data
@@ -160,6 +137,13 @@ export default function ExploreScreen() {
           type: 'youtube',
           featured: true
         })))
+        
+        // Load user data (in a real app, this would come from a user service)
+        // For now, we'll use random values
+        setUserData({
+          streak: Math.floor(Math.random() * 30) + 1,
+          points: Math.floor(Math.random() * 5000) + 500
+        })
       } catch (error) {
         console.error("Error loading content:", error)
       } finally {
@@ -447,28 +431,27 @@ export default function ExploreScreen() {
           {/* Header with greeting */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.greeting}>Hello, {USER.name}! 👋</Text>
-              <Text style={styles.subGreeting}>What would you like to learn today?</Text>
+              <Text style={styles.greeting}>{getDayOfDay()}</Text>
             </View>
             <View style={styles.userStats}>
               <View style={styles.userStatItem}>
                 <FontAwesome5 name="fire" size={16} color="#FF6B6B" />
-                <Text style={styles.userStatText}>{USER.streak} day streak</Text>
+                <Text style={styles.userStatText}>{userData.streak} day streak</Text>
               </View>
               <View style={styles.userStatItem}>
                 <FontAwesome5 name="star" size={16} color="#FFD700" />
-                <Text style={styles.userStatText}>{USER.points} points</Text>
+                <Text style={styles.userStatText}>{userData.points} points</Text>
               </View>
             </View>
           </View>
 
           {/* Search bar */}
           <View style={styles.searchContainer}>
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search for topics, courses, or instructors"
-            />
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Search for topics, courses, or instructors"
+      />
             <TouchableOpacity style={styles.filterButton}>
               <FontAwesome5 name="sliders-h" size={16} color="#666" />
             </TouchableOpacity>
@@ -542,19 +525,19 @@ export default function ExploreScreen() {
           {/* Categories */}
           <View style={styles.categoriesContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Browse Categories</Text>
+      <Text style={styles.sectionTitle}>Browse Categories</Text>
               <TouchableOpacity>
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={CATEGORIES}
-              renderItem={renderCategoryItem}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesList}
-            />
+      <FlatList
+        data={CATEGORIES}
+        renderItem={renderCategoryItem}
+        keyExtractor={(item) => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoriesList}
+      />
           </View>
 
           {/* Recently viewed */}
@@ -582,24 +565,6 @@ export default function ExploreScreen() {
             )}
           </View>
 
-          {/* Popular instructors */}
-          <View style={styles.instructorsContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Popular Instructors</Text>
-              <TouchableOpacity>
-                <Text style={styles.seeAllButton}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={popularInstructors}
-              renderItem={renderInstructor}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.instructorsList}
-            />
-          </View>
-
           {/* Learning paths */}
           <View style={styles.learningPathsContainer}>
             <View style={styles.sectionHeader}>
@@ -621,18 +586,18 @@ export default function ExploreScreen() {
           {/* Trending courses */}
           <View style={styles.trendingContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Trending Courses</Text>
+      <Text style={styles.sectionTitle}>Trending Courses</Text>
               <TouchableOpacity>
                 <Text style={styles.seeAllButton}>See All</Text>
               </TouchableOpacity>
             </View>
             {trendingCourses.length > 0 ? (
-              <FlatList
+      <FlatList
                 data={trendingCourses}
-                renderItem={renderTrendingCourse}
-                keyExtractor={(item) => item.id}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.trendingList}
+        renderItem={renderTrendingCourse}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.trendingList}
                 scrollEnabled={false}
               />
             ) : (

@@ -228,17 +228,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </View>
         )}
 
-        <TouchableOpacity
+                    <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
           <Ionicons 
             name="arrow-back" 
             size={24} 
-            color="#FFF"
-          />
-        </TouchableOpacity>
-        
+                  color="#FFF"
+                />
+              </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.fullscreenButton}
           onPress={toggleFullscreen}
@@ -248,8 +248,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             size={24} 
             color="#FFF"
           />
-        </TouchableOpacity>
-      </View>
+                </TouchableOpacity>
+              </View>
     </View>
   )
 }

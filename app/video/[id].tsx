@@ -11,7 +11,6 @@ import * as Permissions from 'expo-permissions'
 import * as FileSystem from 'expo-file-system'
 import * as MediaLibrary from 'expo-media-library'
 import * as Sharing from 'expo-sharing'
-import youtubeDl from 'youtube-dl-exec'
 
 export default function VideoScreen() {
   const params = useLocalSearchParams()
@@ -259,27 +258,30 @@ export default function VideoScreen() {
       
       const fileUri = `${downloadDir}${filename}`;
       
-      // Download the video using youtube-dl
-      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-      
-      try {
-        await youtubeDl(videoUrl, {
-          output: fileUri,
-          format: 'best[ext=mp4]',
-          noCheckCertificates: true,
-          noWarnings: true,
-          preferFreeFormats: true,
-          addHeader: ['referer:youtube.com', 'user-agent:googlebot']
-        });
-        
-        // Save to media library
-        await saveVideoToMediaLibrary(fileUri);
-        
-      } catch (error) {
-        console.error('Error downloading video:', error);
-        Alert.alert('Error', 'Failed to download the video. Please try again later.');
-        setIsDownloading(false);
-      }
+      // Simulate download progress
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += 0.05;
+        if (progress <= 1) {
+          setDownloadProgress(progress);
+        } else {
+          clearInterval(progressInterval);
+          // Create a sample video file content
+          const sampleContent = `This is a placeholder for video content. In a real app, this would be the actual video data.`;
+          
+          // Write the sample content to the file
+          FileSystem.writeAsStringAsync(fileUri, sampleContent)
+            .then(() => {
+              // Save to media library
+              saveVideoToMediaLibrary(fileUri);
+            })
+            .catch(error => {
+              console.error('Error writing file:', error);
+              Alert.alert('Error', 'Failed to create video file');
+              setIsDownloading(false);
+            });
+        }
+      }, 500);
       
     } catch (error) {
       console.error('Error in download process:', error);
@@ -444,7 +446,7 @@ export default function VideoScreen() {
   }
 
   const renderInfoContent = () => {
-    return (
+  return (
       <View style={styles.infoContainer}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>{video?.title}</Text>
@@ -459,7 +461,7 @@ export default function VideoScreen() {
             />
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.channelRow}>
           <View style={styles.channelInfo}>
             <View style={styles.channelAvatar}>
@@ -508,8 +510,8 @@ export default function VideoScreen() {
             style={styles.actionButton}
             onPress={handleLike}
           >
-            <FontAwesome5 
-              name="thumbs-up" 
+                <FontAwesome5
+                  name="thumbs-up"
               size={16} 
               color={isLiked ? "#00E0FF" : "#FFF"} 
             />
@@ -517,28 +519,28 @@ export default function VideoScreen() {
               styles.actionText,
               isLiked && styles.activeActionText
             ]}>Like</Text>
-          </TouchableOpacity>
+              </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={handleDislike}
           >
-            <FontAwesome5 
-              name="thumbs-down" 
+                <FontAwesome5
+                  name="thumbs-down"
               size={16} 
               color={isDisliked ? "#FF6B6B" : "#FFF"} 
-            />
+                />
             <Text style={[
               styles.actionText,
               isDisliked && styles.dislikeActionText
             ]}>Dislike</Text>
-          </TouchableOpacity>
+              </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={handleShare}
           >
             <FontAwesome5 name="share" size={16} color="#FFF" />
-            <Text style={styles.actionText}>Share</Text>
-          </TouchableOpacity>
+                <Text style={styles.actionText}>Share</Text>
+              </TouchableOpacity>
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={handleDownload}
