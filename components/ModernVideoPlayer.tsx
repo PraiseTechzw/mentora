@@ -6,6 +6,7 @@ import { View, StyleSheet, Dimensions, ActivityIndicator, Text, TouchableOpacity
 import YoutubeIframe from "react-native-youtube-iframe"
 import { Ionicons } from "@expo/vector-icons"
 import * as ScreenOrientation from 'expo-screen-orientation'
+import { useRouter } from "expo-router"
 
 interface VideoPlayerProps {
   videoUrl: string
@@ -34,6 +35,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isPortrait, setIsPortrait] = useState(true)
   const playerRef = useRef(null)
   const { width, height } = Dimensions.get('window')
+  const router = useRouter()
 
   // Extract YouTube video ID from URL
   useEffect(() => {
@@ -225,15 +227,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <ActivityIndicator size="large" color="#00E0FF" />
           </View>
         )}
+
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons 
+            name="arrow-back" 
+            size={24} 
+            color="#FFF"
+          />
+        </TouchableOpacity>
         
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.fullscreenButton}
           onPress={toggleFullscreen}
         >
           <Ionicons 
             name={isFullscreen ? "contract" : "expand"} 
             size={24} 
-            color="#FFF" 
+            color="#FFF"
           />
         </TouchableOpacity>
       </View>
@@ -347,6 +360,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 16,
     right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  } as ViewStyle,
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
     width: 40,
     height: 40,
     borderRadius: 20,
