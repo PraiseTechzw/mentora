@@ -9,7 +9,8 @@ import { FontAwesome5 } from "@expo/vector-icons"
 import { BlurView } from "expo-blur"
 import * as Permissions from 'expo-permissions'
 import * as FileSystem from 'expo-file-system'
-import { MediaLibrary } from 'expo-media-library'
+import * as MediaLibrary from 'expo-media-library'
+import * as Sharing from 'expo-sharing'
 
 export default function VideoScreen() {
   const params = useLocalSearchParams()
@@ -163,8 +164,9 @@ export default function VideoScreen() {
       const timestamp = new Date().getTime();
       const filename = `${videoId}_${timestamp}.mp4`;
       
-      // For demo purposes, we'll use a placeholder URL
-      // In a real app, you would use a proper video download URL
+      // For a real implementation, we would use a YouTube download API
+      // This is a placeholder for demonstration purposes
+      // In a production app, you would use a proper YouTube download service
       const downloadUrl = `https://example.com/download/${videoId}`;
       
       // Create a download directory if it doesn't exist
@@ -177,19 +179,11 @@ export default function VideoScreen() {
       
       const fileUri = `${downloadDir}${filename}`;
       
-      // Start the download with progress tracking
-      const downloadResumable = FileSystem.createDownloadResumable(
-        downloadUrl,
-        fileUri,
-        {},
-        (downloadProgress) => {
-          const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
-          setDownloadProgress(progress);
-        }
-      );
+      // For a real implementation, we would use FileSystem.downloadAsync
+      // This is a placeholder for demonstration purposes
+      // In a production app, you would use a proper download mechanism
       
-      // For demo purposes, we'll simulate a download since we can't actually download YouTube videos
-      // In a real app, you would use the downloadResumable.downloadAsync() method
+      // Simulate download progress
       let progress = 0;
       const interval = setInterval(() => {
         progress += 0.05;
@@ -198,18 +192,78 @@ export default function VideoScreen() {
         if (progress >= 1) {
           clearInterval(interval);
           
+          // Create a sample video file for demonstration
+          // In a real app, this would be the actual downloaded file
+          const sampleVideoContent = 'Sample video content';
+          await FileSystem.writeAsStringAsync(fileUri, sampleVideoContent);
+          
           // Save to media library
-          MediaLibrary.saveToLibraryAsync(fileUri)
-            .then(() => {
-              setIsDownloading(false);
-              setDownloadProgress(0);
-              Alert.alert('Success', 'Video downloaded successfully');
-            })
-            .catch(error => {
-              console.error('Error saving to media library:', error);
-              Alert.alert('Error', 'Failed to save video to media library');
-              setIsDownloading(false);
-            });
+          try {
+            const asset = await MediaLibrary.createAssetAsync(fileUri);
+            await MediaLibrary.createAlbumAsync('Mentora Videos', asset, false);
+            
+            Alert.alert(
+              'Download Complete', 
+              'Video has been downloaded to your media library.',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    setIsDownloading(false);
+                    setDownloadProgress(0);
+                  }
+                }
+              ]
+            );
+          } catch (error) {
+            console.error('Error saving to media library:', error);
+            
+            // If saving to media library fails, offer to share the file
+            if (await Sharing.isAvailableAsync()) {
+              Alert.alert(
+                'Download Complete', 
+                'Video has been downloaded but could not be saved to your media library. Would you like to share it?',
+                [
+                  {
+                    text: 'Cancel',
+                    style: 'cancel',
+                    onPress: () => {
+                      setIsDownloading(false);
+                      setDownloadProgress(0);
+                    }
+                  },
+                  {
+                    text: 'Share',
+                    onPress: async () => {
+                      try {
+                        await Sharing.shareAsync(fileUri);
+                        setIsDownloading(false);
+                        setDownloadProgress(0);
+                      } catch (error) {
+                        console.error('Error sharing file:', error);
+                        Alert.alert('Error', 'Failed to share the file');
+                        setIsDownloading(false);
+                      }
+                    }
+                  }
+                ]
+              );
+            } else {
+              Alert.alert(
+                'Download Complete', 
+                'Video has been downloaded but could not be saved to your media library.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      setIsDownloading(false);
+                      setDownloadProgress(0);
+                    }
+                  }
+                ]
+              );
+            }
+          }
         }
       }, 300);
       
